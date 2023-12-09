@@ -6,11 +6,18 @@ defmodule FlameK8sBackend.MixProject do
   def project do
     [
       app: :flame_k8s_backend,
+      description: "A FLAME backend for Kubernetes",
       version: @version,
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      package: package()
+      package: package(),
+      docs: [
+        main: "readme",
+        extras: ["README.md", "CHANGELOG.md"],
+        source_ref: "v#{@version}",
+        source_url: @source_url
+      ]
     ]
   end
 
@@ -25,7 +32,8 @@ defmodule FlameK8sBackend.MixProject do
   defp deps do
     [
       {:flame, "~> 0.1.5"},
-      {:k8s, "~> 2.5"}
+      {:k8s, "~> 2.5"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
