@@ -1,7 +1,14 @@
-# FlameK8sBackend
+# FLAMEK8sBakend
 
 A [FLAME](https://github.com/phoenixframework/flame/tree/main) Backend for
 Kubernetes. Manages pods as runners in the cluster the app is running in.
+
+[![Module Version](https://img.shields.io/hexpm/v/flame_k8s_backend.svg)](https://hex.pm/packages/flame_k8s_backend)
+[![Last Updated](https://img.shields.io/github/last-commit/mruoss/flame_k8s_backend.svg)](https://github.com/mruoss/flame_k8s_backend/commits/main)
+
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/flame_k8s_backend/)
+[![Total Download](https://img.shields.io/hexpm/dt/flame_k8s_backend.svg)](https://hex.pm/packages/flame_k8s_backend)
+[![License](https://img.shields.io/hexpm/l/flame_k8s_backend.svg)](https://github.com/mruoss/flame_k8s_backend/blob/main/LICENSE)
 
 The current implementation is very basic and more like a proof of concept.
 More configuration options (resources, etc.) will follow.
