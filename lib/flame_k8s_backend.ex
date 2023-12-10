@@ -1,6 +1,8 @@
 defmodule FLAMEK8sBackend do
   @behaviour FLAME.Backend
 
+  alias FlameK8sBackend.K8sClient
+
   require Logger
 
   defstruct token_path: "/var/run/secrets/kubernetes.io/serviceaccount",
@@ -15,7 +17,7 @@ defmodule FLAMEK8sBackend do
             container_name: nil,
             remote_terminator_pid: nil,
             log: false,
-            conn: nil
+            req: nil
 
   @valid_opts ~w(token_path container_name terminator_sup log)a
   @required_config ~w()a
@@ -57,18 +59,12 @@ defmodule FLAMEK8sBackend do
         state.env
       )
 
-    {:ok, conn} = K8s.Conn.from_service_account(state.token_path, insecure_skip_tls_verify: true)
+    {:ok, req} = K8sClient.connect(state.token_path, insecure_skip_tls_verify: true)
 
-    {:ok, base_pod} =
-      K8s.Client.get("v1", "pod",
-        namespace: System.get_env("POD_NAMESPACE"),
-        name: System.get_env("POD_NAME")
-      )
-      |> K8s.Client.put_conn(conn)
-      |> K8s.Client.run()
+    base_pod = K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME"))
 
     new_state =
-      struct(state, conn: conn, base_pod: base_pod, env: new_env, parent_ref: parent_ref)
+      struct(state, req: req, base_pod: base_pod, env: new_env, parent_ref: parent_ref)
 
     {:ok, new_state}
   end
@@ -106,26 +102,14 @@ defmodule FLAMEK8sBackend do
 
     {new_state, req_connect_time} =
       with_elapsed_ms(fn ->
-        {:ok, created_pod} =
+        created_pod =
           state
           |> create_runner_pod()
-          |> K8s.Client.create()
-          |> K8s.Client.put_conn(state.conn)
-          |> K8s.Client.run()
+          |> then(&K8sClient.create_pod(state.req, &1, state.boot_timeout))
 
-        log(state, "Pod Created")
+        log(state, "Pod Created and Scheduled")
 
-        wait_result =
-          created_pod
-          |> K8s.Client.get()
-          |> K8s.Client.put_conn(state.conn)
-          |> K8s.Client.wait_until(
-            find: ["status", "podIP"],
-            eval: &(not is_nil(&1)),
-            timeout: Integer.floor_div(state.boot_timeout, 1000)
-          )
-
-        case wait_result do
+        case created_pod do
           {:ok, pod} ->
             log(state, "Pod Scheduled. IP: #{pod["status"]["podIP"]}")
 
@@ -134,7 +118,7 @@ defmodule FLAMEK8sBackend do
               runner_pod_name: pod["metadata"]["name"]
             )
 
-          {:error, _} ->
+          :error ->
             Logger.error("failed to schedule runner pod within #{state.boot_timeout}ms")
             exit(:timeout)
         end
@@ -192,13 +176,7 @@ defmodule FLAMEK8sBackend do
     namespace = System.get_env("POD_NAMESPACE")
     runner_pod_name = state.runner_pod_name
     log(state, "Deleting Pod #{namespace}/#{runner_pod_name}")
-
-    K8s.Client.delete("v1", "Pod",
-      namespace: namespace,
-      name: runner_pod_name
-    )
-    |> K8s.Client.put_conn(state.conn)
-    |> K8s.Client.run()
+    K8sClient.delete_pod(state.req, namespace, runner_pod_name)
 
     {:noreply, state}
   end
