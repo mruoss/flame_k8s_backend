@@ -1,6 +1,6 @@
-defmodule FlameK8sBackend.K8sClient do
-  @get_pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
-  @create_pod_tpl "/api/v1/namespaces/:namespace/pods"
+defmodule FLAMEK8sBackend.K8sClient do
+  @pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
+  @pod_list_tpl "/api/v1/namespaces/:namespace/pods"
 
   def connect(path_to_token, opts) do
     ca_cert_path = Path.join(path_to_token, "ca.crt")
@@ -31,25 +31,31 @@ defmodule FlameK8sBackend.K8sClient do
     end
   end
 
+  def get_pod!(req, namespace, name) do
+    Req.get!(req, url: @pod_tpl, path_params: [namespace: namespace, name: name]).body
+  end
+
   def get_pod(req, namespace, name) do
-    Req.get!(req, url: @get_pod_tpl, path_params: [namespace: namespace, name: name]).body
+    with {:ok, %{body: body}} <-
+           Req.get(req, url: @pod_tpl, path_params: [namespace: namespace, name: name]),
+         do: {:ok, body}
   end
 
-  def delete_pod(req, namespace, name) do
-    Req.delete!(req, url: @get_pod_tpl, path_params: [namespace: namespace, name: name])
+  def delete_pod!(req, namespace, name) do
+    Req.delete!(req, url: @pod_tpl, path_params: [namespace: namespace, name: name])
   end
 
-  def create_pod(req, pod, timeout) do
+  def create_pod!(req, pod, timeout) do
     name = pod["metadata"]["name"]
     namespace = pod["metadata"]["namespace"]
-    Req.post!(req, url: @create_pod_tpl, path_params: [namespace: namespace], json: pod)
+    Req.post!(req, url: @pod_list_tpl, path_params: [namespace: namespace], json: pod)
     wait_until_scheduled(req, namespace, name, timeout)
   end
 
   defp wait_until_scheduled(_req, _namespace, _name, timeout) when timeout <= 0, do: :error
 
   defp wait_until_scheduled(req, namespace, name, timeout) do
-    case get_pod(req, namespace, name) do
+    case get_pod!(req, namespace, name) do
       %{"status" => %{"podIP" => _}} = pod ->
         {:ok, pod}
 
@@ -71,7 +77,7 @@ defmodule FlameK8sBackend.K8sClient do
     end)
   end
 
-  def verify_2xs({request, response}) do
+  defp verify_2xs({request, response}) do
     if response.status in 200..299 do
       {request, response}
     else

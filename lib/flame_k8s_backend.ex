@@ -1,7 +1,7 @@
 defmodule FLAMEK8sBackend do
   @behaviour FLAME.Backend
 
-  alias FlameK8sBackend.K8sClient
+  alias FLAMEK8sBackend.K8sClient
 
   require Logger
 
@@ -61,12 +61,17 @@ defmodule FLAMEK8sBackend do
 
     {:ok, req} = K8sClient.connect(state.token_path, insecure_skip_tls_verify: true)
 
-    base_pod = K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME"))
+    case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
+      {:ok, base_pod} ->
+        new_state =
+          struct(state, req: req, base_pod: base_pod, env: new_env, parent_ref: parent_ref)
 
-    new_state =
-      struct(state, req: req, base_pod: base_pod, env: new_env, parent_ref: parent_ref)
+        {:ok, new_state}
 
-    {:ok, new_state}
+      {:error, error} ->
+        Logger.error(Exception.message(error))
+        {:error, error}
+    end
   end
 
   @impl true
@@ -105,7 +110,7 @@ defmodule FLAMEK8sBackend do
         created_pod =
           state
           |> create_runner_pod()
-          |> then(&K8sClient.create_pod(state.req, &1, state.boot_timeout))
+          |> then(&K8sClient.create_pod!(state.req, &1, state.boot_timeout))
 
         log(state, "Pod Created and Scheduled")
 
@@ -126,16 +131,6 @@ defmodule FLAMEK8sBackend do
 
     remaining_connect_window = state.boot_timeout - req_connect_time
     runner_node_name = :"#{state.runner_node_basename}@#{new_state.runner_pod_ip}"
-
-    {_, req_connect_time} =
-      with_elapsed_ms(fn ->
-        if connect_to_node(runner_node_name, remaining_connect_window) == :error do
-          Logger.error("failed to connect to runner pod within #{state.boot_timeout}ms")
-          exit(:timeout)
-        end
-      end)
-
-    remaining_connect_window = remaining_connect_window - req_connect_time
 
     log(state, "Waiting for Remote UP. Remaining: #{remaining_connect_window}")
 
@@ -176,7 +171,7 @@ defmodule FLAMEK8sBackend do
     namespace = System.get_env("POD_NAMESPACE")
     runner_pod_name = state.runner_pod_name
     log(state, "Deleting Pod #{namespace}/#{runner_pod_name}")
-    K8sClient.delete_pod(state.req, namespace, runner_pod_name)
+    K8sClient.delete_pod!(state.req, namespace, runner_pod_name)
 
     {:noreply, state}
   end
@@ -227,19 +222,6 @@ defmodule FLAMEK8sBackend do
         ]
       }
     }
-  end
-
-  defp connect_to_node(_node_name, timeout) when timeout <= 0 do
-    :error
-  end
-
-  defp connect_to_node(node_name, timeout) do
-    if Node.connect(node_name) do
-      :ok
-    else
-      Process.sleep(1000)
-      connect_to_node(node_name, timeout - 1000)
-    end
   end
 
   defp rand_id(len) do
