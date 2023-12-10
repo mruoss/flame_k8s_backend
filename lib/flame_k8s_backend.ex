@@ -199,11 +199,6 @@ defmodule FLAMEK8sBackend do
     System.stop()
   end
 
-  def with_elapsed_ms(func) when is_function(func, 0) do
-    {micro, result} = :timer.tc(func)
-    {result, div(micro, 1000)}
-  end
-
   @impl true
   def remote_boot(%FLAMEK8sBackend{parent_ref: parent_ref} = state) do
     log(state, "Remote Boot")
@@ -325,6 +320,11 @@ defmodule FLAMEK8sBackend do
         ]
       }
     }
+  end
+
+  defp with_elapsed_ms(func) when is_function(func, 0) do
+    {micro, result} = :timer.tc(func)
+    {result, div(micro, 1000)}
   end
 
   defp rand_id(len) do
