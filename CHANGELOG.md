@@ -10,11 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+<!--------------------- Don't add new entries after this line --------------------->
+
+## [0.2.0] - 2023-12-10
+
 ### Changed
 
-- Connect to runner node within backend instead of depending on `DNSCluster`.
-
-<!--------------------- Don't add new entries after this line --------------------->
+- Replace `k8s` lib with a lightweight Kubernetes client implementation.
 
 ## [0.1.0] - 2023-12-09
 

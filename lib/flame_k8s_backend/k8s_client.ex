@@ -1,4 +1,6 @@
 defmodule FLAMEK8sBackend.K8sClient do
+  @moduledoc false
+
   @pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
   @pod_list_tpl "/api/v1/namespaces/:namespace/pods"
 

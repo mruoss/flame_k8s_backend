@@ -1,4 +1,107 @@
 defmodule FLAMEK8sBackend do
+  @moduledoc """
+  Kubernetes Backend implementation. In order for this to work, your application
+  needs to meet some requirements.
+
+  ### Env Variables
+
+  In order for the backend to be able to get informations from your pod and use
+  them for  the runner pods (e.g. env variables), you have to define `POD_NAME`
+  and `POD_NAMESPACE` environment variables on your pod.
+
+  ```yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  spec:
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    spec:
+      containers:
+        - env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+  ```
+
+  ### RBAC
+
+  Your application needs run as a service account with permissions to manage
+  pods. This is a simple
+
+  ```yaml
+  ---
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+  name: myapp
+  namespace: app-namespace
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+  namespace: app-namespace
+  name: pod-mgr
+  rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "delete", "patch"]
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+  name: myapp-pod-mgr
+  namespace: app-namespace
+  subjects:
+  - kind: ServiceAccount
+    name: myapp
+    namespace: app-namespace
+  roleRef:
+  kind: Role
+  name: pod-mgr
+  apiGroup: rbac.authorization.k8s.io
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  spec:
+  template:
+    spec:
+      serviceAccountName: flame-test
+  ```
+
+  ### Clustering
+
+  Your application needs to be able to form a cluster with your runners. Define
+  `POD_IP`, `RELEASE_DISTRIBUTION` and `RELEASE_NODE` environment variables on
+  your pods as follows:
+
+  ```yaml
+  apiVersion: apps/v1
+  kind: Deployment
+  spec:
+  template:
+    spec:
+      containers:
+        - env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: RELEASE_DISTRIBUTION
+              value: name
+            - name: RELEASE_NODE
+              value: flame_test@$(POD_IP)
+  ```
+  """
   @behaviour FLAME.Backend
 
   alias FLAMEK8sBackend.K8sClient
@@ -189,11 +292,11 @@ defmodule FLAMEK8sBackend do
 
     container_access =
       case state.container_name do
-        nil -> Access.at(0)
-        name -> K8s.Resource.NamedList.access(name)
+        nil -> []
+        name -> [Access.filter(&(&1["name"] == name))]
       end
 
-    base_container = get_in(base_pod, ["spec", "containers", container_access])
+    base_container = base_pod |> get_in(["spec", "containers" | container_access]) |> List.first()
 
     %{
       "apiVersion" => "v1",

@@ -18,7 +18,7 @@ More configuration options (resources, etc.) will follow.
 ```elixir
 def deps do
   [
-    {:flame_k8s_backend, "~> 0.1.0"}
+    {:flame_k8s_backend, "~> 0.2.0"}
   ]
 end
 ```
@@ -42,8 +42,6 @@ spec:
       app: myapp
   template:
     spec:
-      metadata:
-        app: myapp
       containers:
         - env:
             - name: POD_NAME
@@ -69,12 +67,12 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: myapp
-  namespace: michael-playground
+  namespace: app-namespace
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: michael-playground
+  namespace: app-namespace
   name: pod-mgr
 rules:
   - apiGroups: [""]
@@ -85,11 +83,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: myapp-pod-mgr
-  namespace: michael-playground
+  namespace: app-namespace
 subjects:
   - kind: ServiceAccount
     name: myapp
-    namespace: michael-playground
+    namespace: app-namespace
 roleRef:
   kind: Role
   name: pod-mgr
@@ -105,8 +103,9 @@ spec:
 
 ### Clustering
 
-Your application needs to be able to form a cluster with your runners. Pass the
-following variables to your pods:
+Your application needs to be able to form a cluster with your runners. Define
+`POD_IP`, `RELEASE_DISTRIBUTION` and `RELEASE_NODE` environment variables on
+your pods as follows:
 
 ```yaml
 apiVersion: apps/v1
