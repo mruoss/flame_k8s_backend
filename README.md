@@ -23,7 +23,19 @@ def deps do
 end
 ```
 
-## Requirements
+## Usage
+
+Configure the flame backend in our configuration.
+
+```elixir
+# config.exs
+if config_env() == :prod do
+  config :flame, :backend, FLAMEK8sBackend
+  config :flame, FLAMEK8sBackend, log: :debug
+end
+```
+
+## Prerequisites
 
 ### Env Variables
 

@@ -3,6 +3,18 @@ defmodule FLAMEK8sBackend do
   Kubernetes Backend implementation. In order for this to work, your application
   needs to meet some requirements.
 
+  ### Usage
+
+  Configure the flame backend in our configuration.
+
+  ```
+  # config.exs
+  if config_env() == :prod do
+    config :flame, :backend, FLAMEK8sBackend
+    config :flame, FLAMEK8sBackend, log: :debug
+  end
+  ```
+
   ### Env Variables
 
   In order for the backend to be able to get informations from your pod and use
