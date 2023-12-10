@@ -141,6 +141,18 @@ defmodule FLAMEK8sBackend do
       end)
 
     remaining_connect_window = state.boot_timeout - req_connect_time
+    runner_node_name = :"#{state.runner_node_basename}@#{new_state.runner_pod_ip}"
+
+    {_, req_connect_time} =
+      with_elapsed_ms(fn ->
+        if connect_to_node(runner_node_name, remaining_connect_window) == :error do
+          Logger.error("failed to connect to runner pod within #{state.boot_timeout}ms")
+          exit(:timeout)
+        end
+      end)
+
+    remaining_connect_window = remaining_connect_window - req_connect_time
+
     log(state, "Waiting for Remote UP. Remaining: #{remaining_connect_window}")
 
     remote_terminator_pid =
@@ -157,7 +169,7 @@ defmodule FLAMEK8sBackend do
     new_state =
       struct!(new_state,
         remote_terminator_pid: remote_terminator_pid,
-        runner_node_name: :"#{state.runner_node_basename}@#{new_state.runner_pod_ip}"
+        runner_node_name: runner_node_name
       )
 
     {:ok, remote_terminator_pid, new_state}
@@ -214,11 +226,16 @@ defmodule FLAMEK8sBackend do
       "apiVersion" => "v1",
       "kind" => "Pod",
       "metadata" => %{
-        "namespace" => get_in(base_pod, ~w(metadata namespace)),
+        "namespace" => base_pod["metadata"]["namespace"],
         "name" => runner_pod_name,
-        "labels" => %{
-          "excluster" => get_in(base_pod, ~w(metadata labels excluster))
-        }
+        "ownerReferences" => [
+          %{
+            "apiVersion" => base_pod["apiVersion"],
+            "kind" => base_pod["kind"],
+            "name" => base_pod["metadata"]["name"],
+            "uid" => base_pod["metadata"]["uid"]
+          }
+        ]
       },
       "spec" => %{
         "restartPolicy" => "Never",
@@ -232,6 +249,19 @@ defmodule FLAMEK8sBackend do
         ]
       }
     }
+  end
+
+  defp connect_to_node(_node_name, timeout) when timeout <= 0 do
+    :error
+  end
+
+  defp connect_to_node(node_name, timeout) do
+    if Node.connect(node_name) do
+      :ok
+    else
+      Process.sleep(1000)
+      connect_to_node(node_name, timeout - 1000)
+    end
   end
 
   defp rand_id(len) do

@@ -43,7 +43,6 @@ spec:
   template:
     spec:
       metadata:
-        excluster: flame # see note in the headless service section below
         app: myapp
       containers:
         - env:
@@ -106,12 +105,8 @@ spec:
 
 ### Clustering
 
-Your application needs to be able to form a cluster with your runners. One
-way to achieve this is to use [DNSCluster](https://hexdocs.pm/dns_cluster/DNSCluster.html).
-
-#### ENV Variables
-
-Pass the following variables to your pods
+Your application needs to be able to form a cluster with your runners. Pass the
+following variables to your pods:
 
 ```yaml
 apiVersion: apps/v1
@@ -130,53 +125,4 @@ spec:
               value: name
             - name: RELEASE_NODE
               value: flame_test@$(POD_IP)
-```
-
-#### Headless Service
-
-A [headless service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services)
-tells `DNSCluster` the IP addresses of the runner pods.
-
-**NOTE: The selector you use on the service should NOT be the same label you're
-using for the Replicaset of your deployment. Otherwise the Replicaset controller
-is going to see your runner pods as additional replicas of your application
-and immetiately terminate them!**
-
-```yaml
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: myapp-headless
-  namespace: michael-playground
-spec:
-  selector:
-    excluster: flame
-  type: ClusterIP
-  clusterIP: None
-```
-
-#### DNSCluster Setup
-
-```elixir
-defmodule MyApp.Application do
-  @moduledoc false
-
-  use Application
-
-  @impl true
-  def start(_type, _opts) do
-    children =
-      [
-        # other children
-
-        # use the name of the headless service above for query
-        {DNSCluster, query: "myapp-headless", log: :debug}
-      ]
-
-    Supervisor.start_link(children,
-      strategy: :one_for_one,
-      name: KinoK8s.Supervisor
-    )
-  end
 ```
