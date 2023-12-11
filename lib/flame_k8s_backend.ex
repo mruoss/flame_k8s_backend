@@ -1,7 +1,6 @@
 defmodule FLAMEK8sBackend do
   @moduledoc """
-  Kubernetes Backend implementation. In order for this to work, your application
-  needs to meet some requirements.
+  Kubernetes Backend implementation.
 
   ### Usage
 
@@ -15,7 +14,26 @@ defmodule FLAMEK8sBackend do
   end
   ```
 
-  ### Env Variables
+  ### Options
+
+  The following backend options are supported:
+
+    * `container_name` - If your application pod runs multiple containers
+      (initContainers excluded), use this option to pass the name of the
+      container running this application. If not given, the first container
+      in the list of containers is used to lookup env vars and resources to
+      be used for the runner pods.
+
+    * `:log` - The log level to use for verbose logging. Defaults to `false`.
+
+    * `:token_path` - Path to the service account token. Defaults to
+      `"/var/run/secrets/kubernetes.io/serviceaccount"`
+
+  ### Prerequisites
+
+  In order for this to work, your application needs to meet some requirements.
+
+  #### Env Variables
 
   In order for the backend to be able to get informations from your pod and use
   them for  the runner pods (e.g. env variables), you have to define `POD_NAME`
@@ -44,7 +62,7 @@ defmodule FLAMEK8sBackend do
                   fieldPath: metadata.namespace
   ```
 
-  ### RBAC
+  #### RBAC
 
   Your application needs run as a service account with permissions to manage
   pods. This is a simple
@@ -86,10 +104,10 @@ defmodule FLAMEK8sBackend do
   spec:
   template:
     spec:
-      serviceAccountName: flame-test
+      serviceAccountName: my-app
   ```
 
-  ### Clustering
+  #### Clustering
 
   Your application needs to be able to form a cluster with your runners. Define
   `POD_IP`, `RELEASE_DISTRIBUTION` and `RELEASE_NODE` environment variables on
@@ -111,7 +129,7 @@ defmodule FLAMEK8sBackend do
             - name: RELEASE_DISTRIBUTION
               value: name
             - name: RELEASE_NODE
-              value: flame_test@$(POD_IP)
+              value: my_app@$(POD_IP)
   ```
   """
   @behaviour FLAME.Backend
@@ -326,7 +344,7 @@ defmodule FLAMEK8sBackend do
           %{
             "image" => base_container["image"],
             "name" => runner_pod_name,
-            "resources" => base_container["resources"],
+            "resources" => base_container["resources"] || %{},
             "env" => encode_k8s_env(env) ++ base_container["env"]
           }
         ]

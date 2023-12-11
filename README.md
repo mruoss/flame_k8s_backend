@@ -110,7 +110,7 @@ kind: Deployment
 spec:
   template:
     spec:
-      serviceAccountName: flame-test
+      serviceAccountName: my-app
 ```
 
 ### Clustering
@@ -135,5 +135,5 @@ spec:
             - name: RELEASE_DISTRIBUTION
               value: name
             - name: RELEASE_NODE
-              value: flame_test@$(POD_IP)
+              value: my_app@$(POD_IP)
 ```
