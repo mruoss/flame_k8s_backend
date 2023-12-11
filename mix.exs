@@ -1,7 +1,7 @@
 defmodule FlameK8sBackend.MixProject do
   use Mix.Project
   @source_url "https://github.com/mruoss/flame_k8s_backend"
-  @version "0.2.0"
+  @version "0.2.1"
 
   def project do
     [
