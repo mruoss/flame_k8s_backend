@@ -31,7 +31,7 @@ defmodule FlameK8sBackend.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:flame, "~> 0.1.5"},
+      {:flame, "~> 0.1.6"},
       {:req, "~> 0.4.5"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]

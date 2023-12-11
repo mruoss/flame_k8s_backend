@@ -170,7 +170,7 @@ defmodule FLAMEK8sBackend do
 
     new_env =
       Map.merge(
-        %{PHX_SERVER: "false", DRAGONFLY_PARENT: encoded_parent},
+        %{PHX_SERVER: "false", FLAME_PARENT: encoded_parent},
         state.env
       )
 
