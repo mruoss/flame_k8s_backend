@@ -9,6 +9,7 @@ defmodule FlameK8sBackend.MixProject do
       description: "A FLAME backend for Kubernetes",
       version: @version,
       elixir: "~> 1.15",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -33,7 +34,10 @@ defmodule FlameK8sBackend.MixProject do
     [
       {:flame, "~> 0.1.6"},
       {:req, "~> 0.4.5"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:yaml_elixir, "~> 2.9", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -48,4 +52,7 @@ defmodule FlameK8sBackend.MixProject do
       files: ["lib", "mix.exs", "README*", "LICENSE*", "CHANGELOG.md"]
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test_support"]
+  defp elixirc_paths(_), do: ["lib"]
 end

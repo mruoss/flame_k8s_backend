@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+### Added
+
+- `runner_pod_tpl` option for better control over the runner pod manifest [#2](https://github.com/mruoss/flame_k8s_backend/pull/2)
+
 <!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.2.2] - 2023-12-14

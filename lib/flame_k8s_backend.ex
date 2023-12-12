@@ -7,27 +7,47 @@ defmodule FLAMEK8sBackend do
   Configure the flame backend in our configuration.
 
   ```
-  # config.exs
-  if config_env() == :prod do
-    config :flame, :backend, FLAMEK8sBackend
-    config :flame, FLAMEK8sBackend, log: :debug
-  end
+  # application.ex
+  children = [
+    {FLAME.Pool,
+      name: MyApp.SamplePool,
+      backend: FLAMEK8sBackend,
+      min: 0,
+      max: 10,
+      max_concurrency: 5,
+      idle_shutdown_after: 30_000}
+  ]
   ```
 
   ### Options
 
   The following backend options are supported:
 
-    * `container_name` - If your application pod runs multiple containers
+    * `:app_container_name` - If your application pod runs multiple containers
       (initContainers excluded), use this option to pass the name of the
       container running this application. If not given, the first container
-      in the list of containers is used to lookup env vars and resources to
-      be used for the runner pods.
+      in the list of containers is used to lookup the contaienr image, env vars
+      and resources to be used for the runner pods.
+
+    * `:omit_owner_reference` - If true, no ownerReferences are configured on
+      the runner pods. Defaults to `false`
+
+    * `:runner_pod_tpl` - If given, controls how the runner pod manifest is
+      generated. Can be a function of type
+      `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0` or a struct of type
+      `t:FLAMEK8sBackend.RunnerPodTemplate.t/0`.
+      A callback receives the manifest of the parent pod as a map and should
+      return the runner pod's manifest as a map().
+      If a struct is given, the runner pod's manifest will be generated with
+      values from the struct if given or from the parent pod if omitted.
+      If this option is omitted, the parent pod's `env` and `resources`
+      are used for the runner pod.
+      See `FLAMEK8sBackend.RunnerPodTemplate` for more infos.
 
     * `:log` - The log level to use for verbose logging. Defaults to `false`.
 
-    * `:token_path` - Path to the service account token. Defaults to
-      `"/var/run/secrets/kubernetes.io/serviceaccount"`
+    * `:insecure_skip_tls_verify` - Skip TLS hostname verification. This is
+      required if you connect to your cluster via IP address.
 
   ### Prerequisites
 
@@ -50,16 +70,16 @@ defmodule FLAMEK8sBackend do
     spec:
       containers:
         - env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
   ```
 
   #### RBAC
@@ -72,14 +92,14 @@ defmodule FLAMEK8sBackend do
   apiVersion: v1
   kind: ServiceAccount
   metadata:
-  name: myapp
-  namespace: app-namespace
+    name: myapp
+    namespace: app-namespace
   ---
   apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
-  namespace: app-namespace
-  name: pod-mgr
+    namespace: app-namespace
+    name: pod-mgr
   rules:
   - apiGroups: [""]
     resources: ["pods"]
@@ -88,23 +108,23 @@ defmodule FLAMEK8sBackend do
   apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
-  name: myapp-pod-mgr
-  namespace: app-namespace
+    name: myapp-pod-mgr
+    namespace: app-namespace
   subjects:
   - kind: ServiceAccount
     name: myapp
     namespace: app-namespace
   roleRef:
-  kind: Role
-  name: pod-mgr
-  apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: pod-mgr
+    apiGroup: rbac.authorization.k8s.io
   ---
   apiVersion: apps/v1
   kind: Deployment
   spec:
-  template:
-    spec:
-      serviceAccountName: my-app
+    template:
+      spec:
+        serviceAccountName: my-app
   ```
 
   #### Clustering
@@ -121,43 +141,42 @@ defmodule FLAMEK8sBackend do
     spec:
       containers:
         - env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: status.podIP
-            - name: RELEASE_DISTRIBUTION
-              value: name
-            - name: RELEASE_NODE
-              value: my_app@$(POD_IP)
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: RELEASE_DISTRIBUTION
+            value: name
+          - name: RELEASE_NODE
+            value: my_app@$(POD_IP)
   ```
   """
   @behaviour FLAME.Backend
 
   alias FLAMEK8sBackend.K8sClient
+  alias FLAMEK8sBackend.RunnerPodTemplate
 
   require Logger
 
-  defstruct token_path: "/var/run/secrets/kubernetes.io/serviceaccount",
-            env: %{},
-            base_pod: nil,
+  defstruct env: %{},
+            runner_pod_manifest: nil,
             parent_ref: nil,
             runner_node_basename: nil,
             runner_pod_ip: nil,
             runner_pod_name: nil,
             runner_node_name: nil,
+            runner_pod_tpl: nil,
             boot_timeout: nil,
-            container_name: nil,
             remote_terminator_pid: nil,
             log: false,
             req: nil
 
-  @valid_opts ~w(token_path container_name terminator_sup log)a
+  @valid_opts ~w(app_container_name insecure_skip_tls_verify runner_pod_tpl terminator_sup log)a
   @required_config ~w()a
 
   @impl true
   def init(opts) do
-    :global_group.monitor_nodes(true)
     conf = Application.get_env(:flame, __MODULE__) || []
     [node_base | _ip] = node() |> to_string() |> String.split("@")
 
@@ -186,18 +205,22 @@ defmodule FLAMEK8sBackend do
       |> FLAME.Parent.new(self(), __MODULE__)
       |> FLAME.Parent.encode()
 
-    new_env =
-      Map.merge(
-        %{PHX_SERVER: "false", FLAME_PARENT: encoded_parent},
-        state.env
-      )
-
-    {:ok, req} = K8sClient.connect(state.token_path, insecure_skip_tls_verify: true)
+    {:ok, req} = K8sClient.connect(Keyword.take(provided_opts, [:insecure_skip_tls_verify]))
 
     case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
       {:ok, base_pod} ->
         new_state =
-          struct(state, req: req, base_pod: base_pod, env: new_env, parent_ref: parent_ref)
+          struct(state,
+            req: req,
+            parent_ref: parent_ref,
+            runner_pod_manifest:
+              RunnerPodTemplate.manifest(
+                base_pod,
+                opts[:runner_pod_tpl],
+                encoded_parent,
+                Keyword.take(provided_opts, [:app_container_name, :omit_owner_reference])
+              )
+          )
 
         {:ok, new_state}
 
@@ -226,7 +249,11 @@ defmodule FLAMEK8sBackend do
 
   @impl true
   def system_shutdown do
-    System.stop()
+    # This is not very nice but I don't have the opts on the runner
+    {:ok, req} = K8sClient.connect(insecure_skip_tls_verify: true)
+    namespace = System.get_env("POD_NAMESPACE")
+    name = System.get_env("POD_NAME")
+    K8sClient.delete_pod!(req, namespace, name)
   end
 
   @impl true
@@ -236,15 +263,11 @@ defmodule FLAMEK8sBackend do
     {new_state, req_connect_time} =
       with_elapsed_ms(fn ->
         created_pod =
-          state
-          |> create_runner_pod()
-          |> then(&K8sClient.create_pod!(state.req, &1, state.boot_timeout))
-
-        log(state, "Pod Created and Scheduled")
+          K8sClient.create_pod!(state.req, state.runner_pod_manifest, state.boot_timeout)
 
         case created_pod do
           {:ok, pod} ->
-            log(state, "Pod Scheduled. IP: #{pod["status"]["podIP"]}")
+            log(state, "Runner pod created and scheduled", pod_ip: pod["status"]["podIP"])
 
             struct!(state,
               runner_pod_ip: pod["status"]["podIP"],
@@ -260,12 +283,12 @@ defmodule FLAMEK8sBackend do
     remaining_connect_window = state.boot_timeout - req_connect_time
     runner_node_name = :"#{state.runner_node_basename}@#{new_state.runner_pod_ip}"
 
-    log(state, "Waiting for Remote UP. Remaining: #{remaining_connect_window}")
+    log(state, "Waiting for Remote UP.", remaining_connect_window: remaining_connect_window)
 
     remote_terminator_pid =
       receive do
         {^parent_ref, {:remote_up, remote_terminator_pid}} ->
-          log(state, "Remote is Up!")
+          log(state, "Remote flame is Up!")
           remote_terminator_pid
       after
         remaining_connect_window ->
@@ -283,73 +306,9 @@ defmodule FLAMEK8sBackend do
   end
 
   @impl true
-  def handle_info({:nodedown, down_node}, state) do
-    if down_node == state.runner_node_name do
-      log(state, "Runner #{state.runner_node_name} Down")
-      {:stop, {:shutdown, :noconnection}, state}
-    else
-      log(state, "Other Runner #{down_node} Down")
-      {:noreply, state}
-    end
-  end
-
-  def handle_info({:nodeup, _}, state), do: {:noreply, state}
-
-  def handle_info({ref, {:remote_shutdown, :idle}}, %{parent_ref: ref} = state) do
-    namespace = System.get_env("POD_NAMESPACE")
-    runner_pod_name = state.runner_pod_name
-    log(state, "Deleting Pod #{namespace}/#{runner_pod_name}")
-    K8sClient.delete_pod!(state.req, namespace, runner_pod_name)
-
-    {:noreply, state}
-  end
-
   def handle_info(msg, state) do
     log(state, "Missed message: #{inspect(msg)}")
     {:noreply, state}
-  end
-
-  defp create_runner_pod(state) do
-    %{base_pod: base_pod, env: env} = state
-
-    pod_name_sliced = base_pod |> get_in(~w(metadata name)) |> String.slice(0..40)
-    runner_pod_name = pod_name_sliced <> rand_id(20)
-
-    container_access =
-      case state.container_name do
-        nil -> []
-        name -> [Access.filter(&(&1["name"] == name))]
-      end
-
-    base_container = base_pod |> get_in(["spec", "containers" | container_access]) |> List.first()
-
-    %{
-      "apiVersion" => "v1",
-      "kind" => "Pod",
-      "metadata" => %{
-        "namespace" => base_pod["metadata"]["namespace"],
-        "name" => runner_pod_name,
-        "ownerReferences" => [
-          %{
-            "apiVersion" => base_pod["apiVersion"],
-            "kind" => base_pod["kind"],
-            "name" => base_pod["metadata"]["name"],
-            "uid" => base_pod["metadata"]["uid"]
-          }
-        ]
-      },
-      "spec" => %{
-        "restartPolicy" => "Never",
-        "containers" => [
-          %{
-            "image" => base_container["image"],
-            "name" => runner_pod_name,
-            "resources" => base_container["resources"] || %{},
-            "env" => encode_k8s_env(env) ++ base_container["env"]
-          }
-        ]
-      }
-    }
   end
 
   defp with_elapsed_ms(func) when is_function(func, 0) do
@@ -357,16 +316,7 @@ defmodule FLAMEK8sBackend do
     {result, div(micro, 1000)}
   end
 
-  defp rand_id(len) do
-    len
-    |> :crypto.strong_rand_bytes()
-    |> Base.encode16(padding: false, case: :lower)
-    |> binary_part(0, len)
-  end
-
-  defp encode_k8s_env(env_map) do
-    for {name, value} <- env_map, do: %{"name" => name, "value" => value}
-  end
+  defp log(state, msg, metadata \\ [])
 
   defp log(state, msg, metadata \\ [])
 
