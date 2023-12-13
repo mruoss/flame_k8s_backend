@@ -1,0 +1,14 @@
+{
+  extends: [
+    "config:base",
+    // ":automergeMinor", Not enought tests yet for this...
+    ":automergePr",
+    ":dependencyDashboard",
+    ":label(renovate-update)",
+    ":rebaseStalePrs",
+    ":prConcurrentLimit10",
+  ],
+  cdnurl: {
+    fileMatch: ["^assets/.*\\.tsx?$"],
+  },
+}
