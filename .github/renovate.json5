@@ -8,7 +8,4 @@
     ":rebaseStalePrs",
     ":prConcurrentLimit10",
   ],
-  cdnurl: {
-    fileMatch: ["^assets/.*\\.tsx?$"],
-  },
 }
