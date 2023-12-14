@@ -368,7 +368,7 @@ defmodule FLAMEK8sBackend do
     for {name, value} <- env_map, do: %{"name" => name, "value" => value}
   end
 
-  defp log(%FLAMEK8sBackend{log: false}, _), do: :ok
+  defp log(%FLAMEK8sBackend{log: false}, _, _), do: :ok
 
   defp log(%FLAMEK8sBackend{log: level}, msg, metadata \\ []) do
     Logger.log(level, msg, metadata)
