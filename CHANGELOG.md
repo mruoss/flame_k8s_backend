@@ -10,11 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+<!--------------------- Don't add new entries after this line --------------------->
+
+## [0.2.2] - 2023-12-14
+
 ### Fixed
 
 - Don't crash the runner if the `:log` option is not set (or set to `false`)
-
-<!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.2.1] - 2023-12-11
 
