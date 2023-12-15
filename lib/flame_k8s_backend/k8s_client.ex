@@ -1,12 +1,13 @@
 defmodule FLAMEK8sBackend.K8sClient do
   @moduledoc false
 
+  @sa_token_path "/var/run/secrets/kubernetes.io/serviceaccount"
   @pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
   @pod_list_tpl "/api/v1/namespaces/:namespace/pods"
 
-  def connect(path_to_token, opts) do
-    ca_cert_path = Path.join(path_to_token, "ca.crt")
-    token_path = Path.join(path_to_token, "token")
+  def connect(opts) do
+    ca_cert_path = Path.join(@sa_token_path, "ca.crt")
+    token_path = Path.join(@sa_token_path, "token")
 
     verify =
       if Keyword.get(opts, :insecure_skip_tls_verify, false),

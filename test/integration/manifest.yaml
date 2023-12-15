@@ -1,0 +1,81 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: integration
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: integration
+  namespace: integration
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: integration
+  name: pod-mgr
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["create", "get", "list", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: integration-pod-mgr
+  namespace: integration
+subjects:
+- kind: ServiceAccount
+  name: integration
+  namespace: integration
+roleRef:
+  kind: Role
+  name: pod-mgr
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: integration
+  namespace: integration
+  labels:
+    app:  flame_test
+spec:
+  serviceAccountName: integration
+  containers:
+  - name: integration
+    image: flamek8sbackend:integration
+    command: ["sh", "-c"]
+    args: ["iex --name flame_test@$(POD_IP) --cookie nosecret -S mix run -e FlameK8sBackend.IntegrationTestRunner.run_flame"]
+    resources:
+      requests:
+        cpu: 300m
+        memory: 300Mi
+      limits:
+        cpu: 300m
+        memory: 300Mi
+    env:
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: metadata.namespace
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.podIP
+      - name: RELEASE_DISTRIBUTION
+        value: name
+      - name: RELEASE_NODE
+        value: flame_test@$(POD_IP)
+    ports:
+    - containerPort:  80
+      name: integration
+  restartPolicy: Always
