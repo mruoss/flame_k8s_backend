@@ -1,4 +1,4 @@
-name: Code Quality
+name: Integration Tests
 on:
   push:
     branches: [main]
@@ -7,10 +7,11 @@ on:
 
 env:
   MIX_ENV: test
+  KUBECONFIG: /home/runner/.kube/config
 
 jobs:
   code-quality:
-    name: Code Quality
+    name: Integration Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
@@ -41,14 +42,11 @@ jobs:
       - name: Install Mix Dependencies
         run: mix deps.get
 
-      - name: Check Formatting
-        run: mix format --check-formatted
+      - uses: engineerd/setup-kind@v0.5.0
+        id: kind
+        with:
+          version: v0.20.0
+          name: flame-integration-test
 
-      - name: Compile
-        run: MIX_ENV=test mix compile --warnings-as-errors
-
-      - name: Unit Tests
-        run: MIX_ENV=test mix test
-
-      - name: Run Credo
-        run: MIX_ENV=test mix credo --strict
+      - name: Integration Tests
+        run: MIX_ENV=test mix test --only integration

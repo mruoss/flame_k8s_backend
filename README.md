@@ -28,11 +28,17 @@ end
 Configure the flame backend in our configuration.
 
 ```elixir
-# config.exs
-if config_env() == :prod do
-  config :flame, :backend, FLAMEK8sBackend
-  config :flame, FLAMEK8sBackend, log: :debug
-end
+  # application.ex
+  children = [
+    {FLAME.Pool,
+      name: MyApp.SamplePool,
+      backend: {FLAMEK8sBackend, insecure_skip_tls_verify: true},
+      min: 0,
+      max: 10,
+      max_concurrency: 5,
+      idle_shutdown_after: 30_000,
+      log: :debug}
+  ]
 ```
 
 ## Prerequisites

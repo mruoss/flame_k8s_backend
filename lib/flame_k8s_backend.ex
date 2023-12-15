@@ -318,8 +318,6 @@ defmodule FLAMEK8sBackend do
 
   defp log(state, msg, metadata \\ [])
 
-  defp log(state, msg, metadata \\ [])
-
   defp log(%FLAMEK8sBackend{log: false}, _, _), do: :ok
 
   defp log(%FLAMEK8sBackend{log: level}, msg, metadata) do
