@@ -18,14 +18,14 @@ More configuration options (resources, etc.) will follow.
 ```elixir
 def deps do
   [
-    {:flame_k8s_backend, "~> 0.2.2"}
+    {:flame_k8s_backend, "~> 0.2.3"}
   ]
 end
 ```
 
 ## Usage
 
-Configure the flame backend in our configuration.
+Configure the flame backend in our configuration or application setup:
 
 ```elixir
   # application.ex

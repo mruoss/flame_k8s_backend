@@ -4,7 +4,7 @@ defmodule FLAMEK8sBackend do
 
   ### Usage
 
-  Configure the flame backend in our configuration.
+  Configure the flame backend in our configuration or application setup:
 
   ```
   # application.ex
@@ -254,6 +254,7 @@ defmodule FLAMEK8sBackend do
     namespace = System.get_env("POD_NAMESPACE")
     name = System.get_env("POD_NAME")
     K8sClient.delete_pod!(req, namespace, name)
+    System.stop()
   end
 
   @impl true

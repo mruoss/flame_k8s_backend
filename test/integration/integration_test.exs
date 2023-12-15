@@ -13,7 +13,7 @@ defmodule FlameK8sBackend.IntegrationTest do
     end
 
     Mix.Shell.IO.cmd(
-      "docker build -f test/integration/Dockerfile.integration . -t flamek8sbackend:integration"
+      "docker build -f test/integration/Dockerfile . -t flamek8sbackend:integration"
     )
 
     Mix.Shell.IO.cmd(
