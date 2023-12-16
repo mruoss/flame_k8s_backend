@@ -5,17 +5,17 @@ defmodule FLAMEK8sBackend.K8sClient do
   @pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
   @pod_list_tpl "/api/v1/namespaces/:namespace/pods"
 
-  def connect(opts) do
+  def connect() do
     ca_cert_path = Path.join(@sa_token_path, "ca.crt")
     token_path = Path.join(@sa_token_path, "token")
+    apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST") |> String.to_charlist()
+    apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT_HTTPS")
 
-    verify =
-      if Keyword.get(opts, :insecure_skip_tls_verify, false),
-        do: :verify_none,
-        else: :verify_peer
-
-    apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST")
-    apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT")
+    sni =
+      case :inet.parse_address(apiserver_host) do
+        {:ok, _} -> :disable
+        {:error, _} -> apiserver_host
+      end
 
     with {:ok, token} <- File.read(token_path),
          {:ok, ca_cert_raw} <- File.read(ca_cert_path),
@@ -24,7 +24,13 @@ defmodule FLAMEK8sBackend.K8sClient do
         Req.new(
           base_url: "https://#{apiserver_host}:#{apiserver_port}",
           headers: [{:Authorization, "Bearer #{token}"}],
-          connect_options: [transport_opts: [cacerts: [ca_cert], verify: verify]]
+          connect_options: [
+            transport_opts: [
+              cacerts: [ca_cert],
+              verify: :verify_peer,
+              server_name_indication: sni
+            ]
+          ]
         )
         |> Req.Request.append_response_steps(verify_2xs: &verify_2xs/1)
 

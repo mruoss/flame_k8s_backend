@@ -32,7 +32,7 @@ Configure the flame backend in our configuration or application setup:
   children = [
     {FLAME.Pool,
       name: MyApp.SamplePool,
-      backend: {FLAMEK8sBackend, insecure_skip_tls_verify: true},
+      backend: FLAMEK8sBackend,
       min: 0,
       max: 10,
       max_concurrency: 5,

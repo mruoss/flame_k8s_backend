@@ -46,9 +46,6 @@ defmodule FLAMEK8sBackend do
 
     * `:log` - The log level to use for verbose logging. Defaults to `false`.
 
-    * `:insecure_skip_tls_verify` - Skip TLS hostname verification. This is
-      required if you connect to your cluster via IP address.
-
   ### Prerequisites
 
   In order for this to work, your application needs to meet some requirements.
@@ -172,7 +169,7 @@ defmodule FLAMEK8sBackend do
             log: false,
             req: nil
 
-  @valid_opts ~w(app_container_name insecure_skip_tls_verify runner_pod_tpl terminator_sup log)a
+  @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log)a
   @required_config ~w()a
 
   @impl true
@@ -205,7 +202,7 @@ defmodule FLAMEK8sBackend do
       |> FLAME.Parent.new(self(), __MODULE__)
       |> FLAME.Parent.encode()
 
-    {:ok, req} = K8sClient.connect(Keyword.take(provided_opts, [:insecure_skip_tls_verify]))
+    {:ok, req} = K8sClient.connect()
 
     case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
       {:ok, base_pod} ->
@@ -248,9 +245,9 @@ defmodule FLAMEK8sBackend do
   end
 
   @impl true
-  def system_shutdown do
+  def system_shutdown() do
     # This is not very nice but I don't have the opts on the runner
-    {:ok, req} = K8sClient.connect(insecure_skip_tls_verify: true)
+    {:ok, req} = K8sClient.connect()
     namespace = System.get_env("POD_NAMESPACE")
     name = System.get_env("POD_NAME")
     K8sClient.delete_pod!(req, namespace, name)

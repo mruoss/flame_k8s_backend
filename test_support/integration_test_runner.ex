@@ -10,7 +10,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
         min: 0,
         max: 2,
         idle_shutdown_after: 1_000,
-        backend: {FLAMEK8sBackend, insecure_skip_tls_verify: true},
+        backend: FLAMEK8sBackend,
         log: :debug
         }]
 
