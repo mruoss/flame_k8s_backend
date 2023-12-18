@@ -8,14 +8,8 @@ defmodule FLAMEK8sBackend.K8sClient do
   def connect() do
     ca_cert_path = Path.join(@sa_token_path, "ca.crt")
     token_path = Path.join(@sa_token_path, "token")
-    apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST") |> String.to_charlist()
+    apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST")
     apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT_HTTPS")
-
-    sni =
-      case :inet.parse_address(apiserver_host) do
-        {:ok, _} -> :disable
-        {:error, _} -> apiserver_host
-      end
 
     with {:ok, token} <- File.read(token_path),
          {:ok, ca_cert_raw} <- File.read(ca_cert_path),
@@ -27,8 +21,7 @@ defmodule FLAMEK8sBackend.K8sClient do
           connect_options: [
             transport_opts: [
               cacerts: [ca_cert],
-              verify: :verify_peer,
-              server_name_indication: sni
+              customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
             ]
           ]
         )
@@ -93,4 +86,18 @@ defmodule FLAMEK8sBackend.K8sClient do
       {request, RuntimeError.exception(response.body["message"])}
     end
   end
+
+  # Temporary workaround until this is fixed in some lower layer
+  # https://github.com/erlang/otp/issues/7968
+  # https://github.com/elixir-mint/mint/pull/418
+  defp check_ips_as_dns_id({:dns_id, hostname}, {:iPAddress, ip}) do
+    with {:ok, ip_tuple} <- :inet.parse_address(hostname),
+         ^ip <- Tuple.to_list(ip_tuple) do
+      true
+    else
+      _ -> :default
+    end
+  end
+
+  defp check_ips_as_dns_id(_, _), do: :default
 end
