@@ -143,3 +143,11 @@ spec:
             - name: RELEASE_NODE
               value: my_app@$(POD_IP)
 ```
+
+## How it works
+
+The FLAME Kubernetes backend first queries the Kubernetes API server to extract
+information from the running Pod like the container image, resource requests and
+limits, environment variables etc. This information is then used to build the
+manifest for the runner pod. The backend then sends the resulting manifest to
+the API server in order to spin up a runner pod.
