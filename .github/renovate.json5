@@ -1,7 +1,7 @@
 {
   extends: [
     "config:base",
-    // ":automergeMinor", Not enought tests yet for this...
+    ":automergeMinor",
     ":automergePr",
     ":dependencyDashboard",
     ":label(renovate-update)",
