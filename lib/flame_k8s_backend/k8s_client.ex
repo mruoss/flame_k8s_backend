@@ -5,17 +5,11 @@ defmodule FLAMEK8sBackend.K8sClient do
   @pod_tpl "/api/v1/namespaces/:namespace/pods/:name"
   @pod_list_tpl "/api/v1/namespaces/:namespace/pods"
 
-  def connect(opts) do
+  def connect() do
     ca_cert_path = Path.join(@sa_token_path, "ca.crt")
     token_path = Path.join(@sa_token_path, "token")
-
-    verify =
-      if Keyword.get(opts, :insecure_skip_tls_verify, false),
-        do: :verify_none,
-        else: :verify_peer
-
     apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST")
-    apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT")
+    apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT_HTTPS")
 
     with {:ok, token} <- File.read(token_path),
          {:ok, ca_cert_raw} <- File.read(ca_cert_path),
@@ -24,7 +18,12 @@ defmodule FLAMEK8sBackend.K8sClient do
         Req.new(
           base_url: "https://#{apiserver_host}:#{apiserver_port}",
           headers: [{:Authorization, "Bearer #{token}"}],
-          connect_options: [transport_opts: [cacerts: [ca_cert], verify: verify]]
+          connect_options: [
+            transport_opts: [
+              cacerts: [ca_cert],
+              customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
+            ]
+          ]
         )
         |> Req.Request.append_response_steps(verify_2xs: &verify_2xs/1)
 
@@ -87,4 +86,18 @@ defmodule FLAMEK8sBackend.K8sClient do
       {request, RuntimeError.exception(response.body["message"])}
     end
   end
+
+  # Temporary workaround until this is fixed in some lower layer
+  # https://github.com/erlang/otp/issues/7968
+  # https://github.com/elixir-mint/mint/pull/418
+  defp check_ips_as_dns_id({:dns_id, hostname}, {:iPAddress, ip}) do
+    with {:ok, ip_tuple} <- :inet.parse_address(hostname),
+         ^ip <- Tuple.to_list(ip_tuple) do
+      true
+    else
+      _ -> :default
+    end
+  end
+
+  defp check_ips_as_dns_id(_, _), do: :default
 end
