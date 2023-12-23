@@ -202,7 +202,7 @@ defmodule FLAMEK8sBackend do
       |> FLAME.Parent.new(self(), __MODULE__)
       |> FLAME.Parent.encode()
 
-    {:ok, req} = K8sClient.connect()
+    req = K8sClient.connect()
 
     case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
       {:ok, base_pod} ->
@@ -247,7 +247,7 @@ defmodule FLAMEK8sBackend do
   @impl true
   def system_shutdown() do
     # This is not very nice but I don't have the opts on the runner
-    {:ok, req} = K8sClient.connect()
+    req = K8sClient.connect()
     namespace = System.get_env("POD_NAMESPACE")
     name = System.get_env("POD_NAME")
     K8sClient.delete_pod!(req, namespace, name)
