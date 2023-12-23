@@ -10,27 +10,22 @@ defmodule FLAMEK8sBackend.K8sClient do
     token_path = Path.join(@sa_token_path, "token")
     apiserver_host = System.get_env("KUBERNETES_SERVICE_HOST")
     apiserver_port = System.get_env("KUBERNETES_SERVICE_PORT_HTTPS")
+    token = File.read!(token_path)
 
-    with {:ok, token} <- File.read(token_path),
-         {:ok, ca_cert_raw} <- File.read(ca_cert_path),
-         {:ok, ca_cert} <- cert_from_pem(ca_cert_raw) do
-      req =
-        Req.new(
-          base_url: "https://#{apiserver_host}:#{apiserver_port}",
-          headers: [{:Authorization, "Bearer #{token}"}],
-          connect_options: [
-            transport_opts: [
-              cacerts: [ca_cert],
-              customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
-            ]
+    req =
+      Req.new(
+        base_url: "https://#{apiserver_host}:#{apiserver_port}",
+        headers: [{:Authorization, "Bearer #{token}"}],
+        connect_options: [
+          transport_opts: [
+            cacertfile: String.to_charlist(ca_cert_path),
+            customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
           ]
-        )
-        |> Req.Request.append_response_steps(verify_2xs: &verify_2xs/1)
+        ]
+      )
+      |> Req.Request.append_response_steps(verify_2xs: &verify_2xs/1)
 
-      {:ok, req}
-    else
-      error -> error
-    end
+    req
   end
 
   def get_pod!(req, namespace, name) do
@@ -65,18 +60,6 @@ defmodule FLAMEK8sBackend.K8sClient do
         Process.sleep(1000)
         wait_until_scheduled(req, namespace, name, timeout - 1000)
     end
-  end
-
-  defp cert_from_pem(cert_data) do
-    cert_data
-    |> :public_key.pem_decode()
-    |> Enum.find_value(fn
-      {:Certificate, data, _} ->
-        {:ok, data}
-
-      _ ->
-        {:error, "Certificate data is missing"}
-    end)
   end
 
   defp verify_2xs({request, response}) do
