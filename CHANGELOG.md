@@ -10,11 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+<!--------------------- Don't add new entries after this line --------------------->
+
+## [0.3.1] - 2024-01-28
+
 ### Changed
 
 - Use `:cacertfile` insead of `:cacerts` in `:transport_options` and let the OTP process the certificate - [#8](https://github.com/mruoss/flame_k8s_backend/pull/8)
-
-<!--------------------- Don't add new entries after this line --------------------->
+- Dependency Updates
 
 ## [0.3.0] - 2023-12-19
 

@@ -18,7 +18,7 @@ More configuration options (resources, etc.) will follow.
 ```elixir
 def deps do
   [
-    {:flame_k8s_backend, "~> 0.3.0"}
+    {:flame_k8s_backend, "~> 0.3.1"}
   ]
 end
 ```
