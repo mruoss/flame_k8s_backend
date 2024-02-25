@@ -1,12 +1,11 @@
 {
   extends: [
-    "config:base",
-    ":automergeMinor",
-    ":automergePr",
-    ":dependencyDashboard",
-    ":label(renovate-update)",
-    ":rebaseStalePrs",
-    ":prConcurrentLimit10",
-    ":maintainLockFilesWeekly"
+    'config:recommended',
+    ':automergeMinor',
+    ':automergePr',
+    ':label(renovate-update)',
+    ':rebaseStalePrs',
+    ':prConcurrentLimit10',
+    ':maintainLockFilesWeekly'
   ],
 }
