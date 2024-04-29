@@ -18,7 +18,7 @@ defmodule FLAMEK8sBackend.K8sClient do
         headers: [{:Authorization, "Bearer #{token}"}],
         connect_options: [
           transport_opts: [
-            cacertfile: String.to_charlist(ca_cert_path),
+            cacertfile: String.to_charlist(ca_cert_path)
           ]
         ]
       )
