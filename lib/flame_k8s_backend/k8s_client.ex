@@ -19,7 +19,6 @@ defmodule FLAMEK8sBackend.K8sClient do
         connect_options: [
           transport_opts: [
             cacertfile: String.to_charlist(ca_cert_path),
-            customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
           ]
         ]
       )
@@ -69,18 +68,4 @@ defmodule FLAMEK8sBackend.K8sClient do
       {request, RuntimeError.exception(response.body["message"])}
     end
   end
-
-  # Temporary workaround until this is fixed in some lower layer
-  # https://github.com/erlang/otp/issues/7968
-  # https://github.com/elixir-mint/mint/pull/418
-  defp check_ips_as_dns_id({:dns_id, hostname}, {:iPAddress, ip}) do
-    with {:ok, ip_tuple} <- :inet.parse_address(hostname),
-         ^ip <- Tuple.to_list(ip_tuple) do
-      true
-    else
-      _ -> :default
-    end
-  end
-
-  defp check_ips_as_dns_id(_, _), do: :default
 end
