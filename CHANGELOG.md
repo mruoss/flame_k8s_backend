@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+### Changed
+
+- With `mint` 1.6.0 out, we have no need for the temporary workaround for TLS
+  verification anymore.
+
 <!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.3.2] - 2024-02-25
