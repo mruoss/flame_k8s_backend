@@ -1,4 +1,4 @@
-# FLAMEK8sBakend
+# FLAMEK8sBackend
 
 A [FLAME](https://github.com/phoenixframework/flame/tree/main) Backend for
 Kubernetes. Manages pods as runners in the cluster the app is running in.
