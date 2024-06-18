@@ -156,12 +156,8 @@ defmodule FLAMEK8sBackend do
 
   require Logger
 
-  defstruct env: %{},
-            runner_pod_manifest: nil,
+  defstruct runner_pod_manifest: nil,
             parent_ref: nil,
-            runner_node_basename: nil,
-            runner_pod_ip: nil,
-            runner_pod_name: nil,
             runner_node_name: nil,
             runner_pod_tpl: nil,
             boot_timeout: nil,
@@ -175,11 +171,10 @@ defmodule FLAMEK8sBackend do
   @impl true
   def init(opts) do
     conf = Application.get_env(:flame, __MODULE__) || []
-    [node_base | _ip] = node() |> to_string() |> String.split("@")
+    [_node_base | _ip] = node() |> to_string() |> String.split("@")
 
     default = %FLAMEK8sBackend{
-      boot_timeout: 30_000,
-      runner_node_basename: node_base
+      boot_timeout: 30_000
     }
 
     provided_opts =
@@ -197,11 +192,6 @@ defmodule FLAMEK8sBackend do
 
     parent_ref = make_ref()
 
-    encoded_parent =
-      parent_ref
-      |> FLAME.Parent.new(self(), __MODULE__)
-      |> FLAME.Parent.encode()
-
     req = K8sClient.connect()
 
     case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
@@ -214,7 +204,7 @@ defmodule FLAMEK8sBackend do
               RunnerPodTemplate.manifest(
                 base_pod,
                 opts[:runner_pod_tpl],
-                encoded_parent,
+                parent_ref,
                 Keyword.take(provided_opts, [:app_container_name, :omit_owner_reference])
               )
           )
@@ -266,11 +256,7 @@ defmodule FLAMEK8sBackend do
         case created_pod do
           {:ok, pod} ->
             log(state, "Runner pod created and scheduled", pod_ip: pod["status"]["podIP"])
-
-            struct!(state,
-              runner_pod_ip: pod["status"]["podIP"],
-              runner_pod_name: pod["metadata"]["name"]
-            )
+            state
 
           :error ->
             Logger.error("failed to schedule runner pod within #{state.boot_timeout}ms")
@@ -279,7 +265,6 @@ defmodule FLAMEK8sBackend do
       end)
 
     remaining_connect_window = state.boot_timeout - req_connect_time
-    runner_node_name = :"#{state.runner_node_basename}@#{new_state.runner_pod_ip}"
 
     log(state, "Waiting for Remote UP.", remaining_connect_window: remaining_connect_window)
 
@@ -297,7 +282,7 @@ defmodule FLAMEK8sBackend do
     new_state =
       struct!(new_state,
         remote_terminator_pid: remote_terminator_pid,
-        runner_node_name: runner_node_name
+        runner_node_name: node(remote_terminator_pid)
       )
 
     {:ok, remote_terminator_pid, new_state}

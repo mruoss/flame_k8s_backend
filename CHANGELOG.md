@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+- Support for FLAME >= 0.2.0 and livebook integraion (requires livebook >= 0.13.0) - [#32](https://github.com/mruoss/flame_k8s_backend/pull/32)
+
 ## [0.3.3] - 2024-04-29
 
 ### Changed
