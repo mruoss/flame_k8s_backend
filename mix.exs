@@ -33,7 +33,7 @@ defmodule FlameK8sBackend.MixProject do
   defp deps do
     [
       {:flame, "~> 0.2.0"},
-      {:req, "~> 0.4.5"},
+      {:req, "~> 0.5.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
