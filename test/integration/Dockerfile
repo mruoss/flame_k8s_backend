@@ -1,5 +1,5 @@
 
-FROM hexpm/elixir:1.15.7-erlang-26.1.2-debian-buster-20231009 
+FROM hexpm/elixir:1.17.1-erlang-27.0-debian-bullseye-20240612-slim
 
 ENV MIX_ENV=test \
     MIX_HOME=/opt/mix \

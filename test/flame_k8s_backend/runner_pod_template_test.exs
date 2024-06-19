@@ -6,6 +6,14 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
   import YamlElixir.Sigil
 
+  defp flame_parent(pod_manifest) do
+    pod_manifest
+    |> get_in(env_var_access("FLAME_PARENT"))
+    |> List.first()
+    |> Base.decode64!()
+    |> :erlang.binary_to_term()
+  end
+
   defp env_var_access(name) do
     app_container_access(["env", Access.filter(&(&1["name"] == name)), "value"])
   end
@@ -40,7 +48,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
         )
       end
 
-      MUT.manifest(parent_pod_manifest, callback, "ENCODED_PARNET_REF")
+      MUT.manifest(parent_pod_manifest, callback, make_ref())
     end
 
     test "should return pod manifest with data form callback", %{
@@ -63,7 +71,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
         )
       end
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
 
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
       assert get_in(pod_manifest, app_container_access(~w(resources limits memory))) == "500Mi"
@@ -85,7 +93,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
         """
       end
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
       assert get_in(pod_manifest, app_container_access() ++ ["image"]) == "flame-test-image:0.1.0"
 
       owner_references = get_in(pod_manifest, ~w(metadata ownerReferences))
@@ -112,7 +120,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       end
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, "ENCODED_PARNET_REF",
+        MUT.manifest(parent_pod_manifest, callback, make_ref(),
           app_container_name: "other-container"
         )
 
@@ -136,9 +144,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       end
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, "ENCODED_PARNET_REF",
-          omit_owner_reference: true
-        )
+        MUT.manifest(parent_pod_manifest, callback, make_ref(), omit_owner_reference: true)
 
       assert [] == get_in(pod_manifest, ~w(metadata ownerReferences))
     end
@@ -149,17 +155,17 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       parent_pod_manifest_full: parent_pod_manifest
     } do
       template_opts = %MUT{}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
-      assert get_in(pod_manifest, env_var_access("FLAME_PARENT")) == ["ENCODED_PARNET_REF"]
     end
 
     test "Only default envs if add_parent_env is set to false", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
+      ref = make_ref()
       template_opts = %MUT{add_parent_env: false}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, ref)
 
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
       assert get_in(pod_manifest, env_var_access("POD_NAMESPACE")) == ["test-namespace"]
@@ -168,7 +174,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                get_in(pod_manifest, env_var_access("POD_NAME"))
 
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
-      assert get_in(pod_manifest, env_var_access("FLAME_PARENT")) == ["ENCODED_PARNET_REF"]
+      parent = flame_parent(pod_manifest)
+      assert parent.ref == ref
     end
   end
 
@@ -177,22 +184,20 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       parent_pod_manifest_full: parent_pod_manifest
     } do
       template_opts = %MUT{env: [%{"name" => "FOO", "value" => "bar"}]}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
-      assert get_in(pod_manifest, env_var_access("FLAME_PARENT")) == ["ENCODED_PARNET_REF"]
     end
 
     test "No parent envs if add_parent_env is set to false", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
       template_opts = %MUT{env: [%{"name" => "FOO", "value" => "bar"}], add_parent_env: false}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == []
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
-      assert get_in(pod_manifest, env_var_access("FLAME_PARENT")) == ["ENCODED_PARNET_REF"]
     end
   end
 
@@ -200,12 +205,11 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "Uses parent pod's values for empty template opts", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      pod_manifest = MUT.manifest(parent_pod_manifest, nil, "ENCODED_PARNET_REF")
+      pod_manifest = MUT.manifest(parent_pod_manifest, nil, make_ref())
 
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
-      assert get_in(pod_manifest, env_var_access("FLAME_PARENT")) == ["ENCODED_PARNET_REF"]
     end
   end
 end

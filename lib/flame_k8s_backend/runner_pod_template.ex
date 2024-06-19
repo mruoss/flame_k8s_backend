@@ -121,22 +121,22 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   """
   @spec manifest(parent_pod_manifest(), t() | callback(), Keyword.t()) ::
           runner_pod_template :: map()
-  def manifest(parent_pod_manifest, template_args_or_callback, encoded_parent, opts \\ [])
+  def manifest(parent_pod_manifest, template_args_or_callback, parent_ref, opts \\ [])
 
-  def manifest(parent_pod_manifest, template_callback, encoded_parent, opts)
+  def manifest(parent_pod_manifest, template_callback, parent_ref, opts)
       when is_function(template_callback) do
     app_container = app_container(parent_pod_manifest, opts)
 
     parent_pod_manifest
     |> template_callback.()
-    |> apply_defaults(parent_pod_manifest, app_container, encoded_parent, opts)
+    |> apply_defaults(parent_pod_manifest, app_container, parent_ref, opts)
   end
 
-  def manifest(parent_pod_manifest, nil, encoded_parent, opts) do
-    manifest(parent_pod_manifest, %RunnerPodTemplate{}, encoded_parent, opts)
+  def manifest(parent_pod_manifest, nil, parent_ref, opts) do
+    manifest(parent_pod_manifest, %RunnerPodTemplate{}, parent_ref, opts)
   end
 
-  def manifest(parent_pod_manifest, %RunnerPodTemplate{} = template_opts, encoded_parent, opts) do
+  def manifest(parent_pod_manifest, %RunnerPodTemplate{} = template_opts, parent_ref, opts) do
     app_container = app_container(parent_pod_manifest, opts)
     env = template_opts.env || []
 
@@ -159,24 +159,34 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       }
     }
 
-    apply_defaults(runner_pod_template, parent_pod_manifest, app_container, encoded_parent, opts)
+    apply_defaults(runner_pod_template, parent_pod_manifest, app_container, parent_ref, opts)
   end
 
   defp apply_defaults(
          runner_pod_template,
          parent_pod_manifest,
          app_container,
-         encoded_parent,
+         parent_ref,
          opts
        ) do
     parent_pod_manifest_name = parent_pod_manifest["metadata"]["name"]
     pod_name_sliced = String.slice(parent_pod_manifest_name, 0..40)
-    runner_pod_name = pod_name_sliced <> rand_id(20)
+    runner_pod_name = "#{pod_name_sliced}-#{rand_id(20)}"
 
     object_references =
       if opts[:omit_owner_reference],
         do: [],
         else: object_references(parent_pod_manifest)
+
+    parent = FLAME.Parent.new(parent_ref, self(), FLAMEK8sBackend, runner_pod_name, "POD_IP")
+
+    parent =
+      case System.get_env("FLAME_K8S_BACKEND_GIT_REF") do
+        nil -> parent
+        git_ref -> struct(parent, backend_vsn: [github: "mruoss/flame_k8s_backend", ref: git_ref])
+      end
+
+    encoded_parent = FLAME.Parent.encode(parent)
 
     runner_pod_template
     |> Map.merge(%{"apiVersion" => "v1", "kind" => "Pod"})
