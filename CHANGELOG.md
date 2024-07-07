@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+### Changed
+
+- Remove `Req` dependency and use `:httpc` instead in order to be safer when run in Livebook. [#35](https://github.com/mruoss/flame_k8s_backend/pull/35)
+
 <!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.4.0] - 2024-06-19
