@@ -20,7 +20,7 @@ defmodule FlameK8sBackend.IntegrationTest do
       "kind load docker-image --name flame-integration-test flamek8sbackend:integration"
     )
 
-    Mix.Shell.IO.cmd("kubectl config set-context kind-flame-integration-test")
+    Mix.Shell.IO.cmd("kubectl config set-context --current kind-flame-integration-test")
     Mix.Shell.IO.cmd("kubectl delete -f test/integration/manifest.yaml")
     Mix.Shell.IO.cmd("kubectl apply -f test/integration/manifest.yaml")
 

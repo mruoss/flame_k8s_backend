@@ -163,7 +163,7 @@ defmodule FLAMEK8sBackend do
             boot_timeout: nil,
             remote_terminator_pid: nil,
             log: false,
-            req: nil
+            http: nil
 
   @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log)a
   @required_config ~w()a
@@ -192,13 +192,13 @@ defmodule FLAMEK8sBackend do
 
     parent_ref = make_ref()
 
-    req = K8sClient.connect()
+    http = K8sClient.connect()
 
-    case K8sClient.get_pod(req, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
+    case K8sClient.get_pod(http, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
       {:ok, base_pod} ->
         new_state =
           struct(state,
-            req: req,
+            http: http,
             parent_ref: parent_ref,
             runner_pod_manifest:
               RunnerPodTemplate.manifest(
@@ -237,10 +237,10 @@ defmodule FLAMEK8sBackend do
   @impl true
   def system_shutdown() do
     # This is not very nice but I don't have the opts on the runner
-    req = K8sClient.connect()
+    http = K8sClient.connect()
     namespace = System.get_env("POD_NAMESPACE")
     name = System.get_env("POD_NAME")
-    K8sClient.delete_pod!(req, namespace, name)
+    K8sClient.delete_pod!(http, namespace, name)
     System.stop()
   end
 
@@ -251,7 +251,7 @@ defmodule FLAMEK8sBackend do
     {new_state, req_connect_time} =
       with_elapsed_ms(fn ->
         created_pod =
-          K8sClient.create_pod!(state.req, state.runner_pod_manifest, state.boot_timeout)
+          K8sClient.create_pod!(state.http, state.runner_pod_manifest, state.boot_timeout)
 
         case created_pod do
           {:ok, pod} ->
