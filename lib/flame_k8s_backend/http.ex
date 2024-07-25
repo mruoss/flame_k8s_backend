@@ -36,6 +36,7 @@ defmodule FlameK8sBackend.HTTP do
           {:ok, String.t()} | {:error, String.t()}
   defp request(http, verb, path, body \\ nil) do
     headers = [{~c"Authorization", ~c"Bearer #{http.token}"}]
+
     http_opts = [
       ssl: [
         verify: :verify_peer,
@@ -64,7 +65,7 @@ defmodule FlameK8sBackend.HTTP do
     end
   end
 
-  if String.to_integer(System.otp_release) < 27 do
+  if String.to_integer(System.otp_release()) < 27 do
     # Workaround for an issue in OTP<27
     # https://github.com/erlang/otp/issues/7968
     defp check_ips_as_dns_id({:dns_id, hostname}, {:iPAddress, ip}) do
