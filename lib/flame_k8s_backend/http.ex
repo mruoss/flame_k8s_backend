@@ -44,6 +44,7 @@ defmodule FlameK8sBackend.HTTP do
         customize_hostname_check: [match_fun: &check_ips_as_dns_id/2]
       ]
     ]
+
     url = http.base_url <> path
 
     request =
