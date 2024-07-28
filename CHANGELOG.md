@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.4.2] - 2024-07-28
+
+### Fixed
+
+- SSL cert verification workaround for older OTP versions was added again - [#37](https://github.com/mruoss/flame_k8s_backend/issues/37) [#38](https://github.com/mruoss/flame_k8s_backend/pull/38)
+- Upgraded FLAME dependency to `0.3.0`
+
 ## [0.4.1] - 2024-07-07
 
 ### Changed
