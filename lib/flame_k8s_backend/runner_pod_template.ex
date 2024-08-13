@@ -210,7 +210,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
           %{"name" => "FLAME_PARENT", "value" => encoded_parent}
           | Enum.reject(
               env,
-              &(&1["name"] in ["PHX_SERVER", "FLAME_BACKEND", "POD_NAME", "POD_NAMESPACE"])
+              &(&1["name"] in ["FLAME_BACKEND", "POD_NAME", "POD_NAMESPACE"])
             )
         ]
       end)
