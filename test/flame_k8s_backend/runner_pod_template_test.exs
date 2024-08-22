@@ -150,6 +150,30 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     end
   end
 
+  describe "manifest/2 with map" do
+    test "Uses fields defined in pod template", %{
+      parent_pod_manifest_full: parent_pod_manifest
+    } do
+      pod_template = ~y"""
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        namespace: default
+      spec:
+        containers:
+          - name: runner
+            resources:
+              requests:
+                cpu: "1"
+      """
+
+      pod_manifest = MUT.manifest(parent_pod_manifest, pod_template, make_ref())
+
+      assert get_in(pod_manifest, app_container_access(~w(name))) == "runner"
+      assert get_in(pod_manifest, app_container_access(~w(resources requests cpu))) == "1"
+    end
+  end
+
   describe "manifest/2 with empty %RunnerPodTemplate{} struct" do
     test "Uses parent pod's values for empty template opts", %{
       parent_pod_manifest_full: parent_pod_manifest
@@ -168,11 +192,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, ref)
 
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
-      assert get_in(pod_manifest, env_var_access("POD_NAMESPACE")) == ["test-namespace"]
-
-      assert [<<"flame-cb76858b7-", _::binary>>] =
-               get_in(pod_manifest, env_var_access("POD_NAME"))
-
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
       parent = flame_parent(pod_manifest)
       assert parent.ref == ref

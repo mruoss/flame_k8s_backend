@@ -20,11 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Support for binary BYO runner pod templates
+- Support for BYO runner pod templates as map.
 
 ## [0.4.2] - 2024-07-28
 
-### Fixed
+### Fixed
 
 - SSL cert verification workaround for older OTP versions was added again - [#37](https://github.com/mruoss/flame_k8s_backend/issues/37) [#38](https://github.com/mruoss/flame_k8s_backend/pull/38)
 - Upgraded FLAME dependency to `0.3.0`
