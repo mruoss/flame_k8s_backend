@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.4.3] - 2024-08-22
+
+### Fixed
+
+- use `FLAME.Parser.JSON` instead of `Jason`
+
+### Added
+
+- Support for binary BYO runner pod templates
+
 ## [0.4.2] - 2024-07-28
 
 ### Fixed
