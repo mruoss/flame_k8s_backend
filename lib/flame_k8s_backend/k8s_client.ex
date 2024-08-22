@@ -24,8 +24,12 @@ defmodule FLAMEK8sBackend.K8sClient do
   end
 
   def get_pod(http, namespace, name) do
-    with {:ok, response_body} <- HTTP.get(http, pod_path(namespace, name)),
-         do: Jason.decode(response_body)
+    with {:ok, response_body} <- HTTP.get(http, pod_path(namespace, name)) do
+      {:ok,
+       response_body
+       |> List.to_string()
+       |> FLAME.Parser.JSON.decode!()}
+    end
   end
 
   def delete_pod!(http, namespace, name) do
@@ -33,9 +37,9 @@ defmodule FLAMEK8sBackend.K8sClient do
   end
 
   def create_pod!(http, pod, timeout) do
-    name = pod["metadata"]["name"]
     namespace = pod["metadata"]["namespace"]
-    HTTP.post!(http, pod_path(namespace, ""), Jason.encode!(pod))
+    created_pod = HTTP.post!(http, pod_path(namespace, ""), FLAME.Parser.JSON.encode!(pod))
+    name = created_pod["metadata"]["name"]
     wait_until_scheduled(http, namespace, name, timeout)
   end
 

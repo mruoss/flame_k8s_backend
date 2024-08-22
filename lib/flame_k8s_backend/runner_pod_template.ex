@@ -35,6 +35,72 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   # ...
   ```
 
+  ### Advanced Use Cases
+
+  In some cases you might need advanced control over the runner pod manifest.
+  Maybe you want to set node affinity because you need your runners to run on
+  nodes with GPUs or you need additional volumes etc. In this case, you can set
+  `runner_pod_tpl` to either a map representing the Pod manifest or a callback
+  function as described below.
+
+  #### Using a Manifest Map
+
+  You can set `runner_pod_tpl` to a map representing the manifest of the runner
+  Pod:
+
+
+  ```
+  # application.ex
+  alias FLAMEK8sBackend.RunnerPodTemplate
+  import YamlElixir.Sigil
+
+  pod_template = ~y\"\"\"
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    # your metadata
+  spec:
+    # Pod spec
+  \"\"\"
+
+  children = [
+    {FLAME.Pool,
+      name: MyApp.SamplePool,
+      backend: {FLAMEK8sBackend, runner_pod_tpl: pod_template},
+      # other opts
+    }
+  ]
+  # ...
+  ```
+
+  #### Using a Callback Function
+
+  The callback has to be of type
+  `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0`. The callback will be called
+  with the manifest of the parent pod which can be used to extract information.
+  It should return a pod template as a map
+
+  Define a callback, e.g. in a separate module:
+
+  ```
+  defmodule MyApp.FLAMERunnerPodTemplate do
+    def runner_pod_manifest(parent_pod_manifest) do
+      %{
+        "metadata" => %{
+          # namespace, labels, ownerReferences,...
+        },
+        "spec" => %{
+          "containers" => [
+            %{
+              # container definition
+            }
+          ]
+        }
+      }
+    end
+  end
+  ```
+
   ### Advanced Use Case - Passing a Callback Function
 
   In some cases you might need advanced control over the runner pod manifest.
@@ -42,9 +108,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   nodes with GPUs or you need additional volumes etc. In this case, you can pass
   a callback via `runner_pod_tpl` option to the `FLAMEK8sBackend`.
 
-  The callback has to be of type `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0`.
-  The callback will be called with the manifest of the parent pod which can be
-  used to extract information. It should return a pod template as a map
+  The callback has to be of type
+  `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0`. The callback will be called
+  with the manifest of the parent pod which can be used to extract information.
+  It should return a pod template as a map
 
   Define a callback, e.g. in a separate module:
 
@@ -89,18 +156,19 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   > your callback function, are going to be overwritten:
   >
   >   * `apiVersion` and `Kind` of the resource (set to `v1/Pod`)
-  >   * The pod's and container's names (set to a combination of the parent pod's
-  >     name and a random id)
+  >   * The pod's and container's names (set to a combination of the parent
+  >     pod's name and a random id)
   >   * The `restartPolicy` (set to `Never`)
-  >   * The container `image` (set to the image of the parent pod's app container)
+  >   * The container `image` (set to the image of the parent pod's app
+  >     container)
 
   ### Options
 
   * `:omit_owner_reference` - Omit generating and appending the parent pod as
     `ownerReference` to the runner pod's metadata
 
-  * `:app_container_name` - name of the container running this application.
-    By default, the first container in the list of containers is used.
+  * `:app_container_name` - name of the container running this application. By
+    default, the first container in the list of containers is used.
   """
 
   alias FLAMEK8sBackend.RunnerPodTemplate
@@ -162,6 +230,12 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
     apply_defaults(runner_pod_template, parent_pod_manifest, app_container, parent_ref, opts)
   end
 
+  def manifest(parent_pod_manifest, runner_pod_template, parent_ref, opts)
+      when is_map(runner_pod_template) do
+    app_container = app_container(parent_pod_manifest, opts)
+    apply_defaults(runner_pod_template, parent_pod_manifest, app_container, parent_ref, opts)
+  end
+
   defp apply_defaults(
          runner_pod_template,
          parent_pod_manifest,
@@ -170,15 +244,14 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
          opts
        ) do
     parent_pod_manifest_name = parent_pod_manifest["metadata"]["name"]
-    pod_name_sliced = String.slice(parent_pod_manifest_name, 0..40)
-    runner_pod_name = "#{pod_name_sliced}-#{rand_id(20)}"
 
     object_references =
       if opts[:omit_owner_reference],
         do: [],
         else: object_references(parent_pod_manifest)
 
-    parent = FLAME.Parent.new(parent_ref, self(), FLAMEK8sBackend, runner_pod_name, "POD_IP")
+    parent =
+      FLAME.Parent.new(parent_ref, self(), FLAMEK8sBackend, parent_pod_manifest_name, "POD_IP")
 
     parent =
       case System.get_env("FLAME_K8S_BACKEND_GIT_REF") do
@@ -190,21 +263,28 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
 
     runner_pod_template
     |> Map.merge(%{"apiVersion" => "v1", "kind" => "Pod"})
-    |> put_in(~w(metadata name), runner_pod_name)
+    |> put_in(~w(metadata generateName), parent_pod_manifest_name <> "-")
     |> put_in(~w(metadata ownerReferences), object_references)
     |> put_in(~w(spec restartPolicy), "Never")
     |> put_in(~w(spec serviceAccount), parent_pod_manifest["spec"]["serviceAccount"])
     |> update_in(["spec", "containers", Access.at(0)], fn container ->
       container
       |> Map.put("image", app_container["image"])
-      |> Map.put("name", runner_pod_name)
+      |> Map.put("name", "runner")
       |> Map.put_new("env", [])
       |> Map.update!("env", fn env ->
         [
-          %{"name" => "POD_NAME", "value" => runner_pod_name},
+          %{
+            "name" => "POD_NAME",
+            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.name"}}
+          },
+          %{
+            "name" => "POD_IP",
+            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "status.podIP"}}
+          },
           %{
             "name" => "POD_NAMESPACE",
-            "value" => get_in(runner_pod_template, ~w(metadata namespace))
+            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
           },
           %{"name" => "PHX_SERVER", "value" => "false"},
           %{"name" => "FLAME_PARENT", "value" => encoded_parent}
@@ -239,12 +319,5 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
         "uid" => parent_pod_manifest["metadata"]["uid"]
       }
     ]
-  end
-
-  defp rand_id(len) do
-    len
-    |> :crypto.strong_rand_bytes()
-    |> Base.encode16(padding: false, case: :lower)
-    |> binary_part(0, len)
   end
 end

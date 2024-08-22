@@ -27,8 +27,13 @@ defmodule FlameK8sBackend.HTTP do
   @spec request!(http :: t(), verb :: atom(), path :: Stringt.t()) :: map()
   defp request!(http, verb, path, body \\ nil) do
     case request(http, verb, path, body) do
-      {:ok, response_body} -> Jason.decode!(response_body)
-      {:error, reason} -> raise reason
+      {:ok, response_body} ->
+        response_body
+        |> List.to_string()
+        |> FLAME.Parser.JSON.decode!()
+
+      {:error, reason} ->
+        raise reason
     end
   end
 
