@@ -1,5 +1,7 @@
 defmodule FlameK8sBackend.HTTP do
   @moduledoc false
+  alias Credo.CLI.Output.Formatter.JSON
+  alias FLAME.Parser.JSON
 
   defstruct [:base_url, :token, :cacertfile]
 
@@ -30,7 +32,7 @@ defmodule FlameK8sBackend.HTTP do
       {:ok, response_body} ->
         response_body
         |> List.to_string()
-        |> FLAME.Parser.JSON.decode!()
+        |> JSON.decode!()
 
       {:error, reason} ->
         raise reason

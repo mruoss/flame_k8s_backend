@@ -54,14 +54,14 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   alias FLAMEK8sBackend.RunnerPodTemplate
   import YamlElixir.Sigil
 
-  pod_template = ~y\"\"\"
+  pod_template = ~y\"""
   apiVersion: v1
   kind: Pod
   metadata:
     # your metadata
   spec:
     # Pod spec
-  \"\"\"
+  \"""
 
   children = [
     {FLAME.Pool,

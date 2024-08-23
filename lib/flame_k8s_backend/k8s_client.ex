@@ -3,6 +3,7 @@ defmodule FLAMEK8sBackend.K8sClient do
 
   @sa_token_path "/var/run/secrets/kubernetes.io/serviceaccount"
 
+  alias FLAME.Parser.JSON
   alias FlameK8sBackend.HTTP
 
   def connect() do
@@ -28,7 +29,7 @@ defmodule FLAMEK8sBackend.K8sClient do
       {:ok,
        response_body
        |> List.to_string()
-       |> FLAME.Parser.JSON.decode!()}
+       |> JSON.decode!()}
     end
   end
 
@@ -38,7 +39,7 @@ defmodule FLAMEK8sBackend.K8sClient do
 
   def create_pod!(http, pod, timeout) do
     namespace = pod["metadata"]["namespace"]
-    created_pod = HTTP.post!(http, pod_path(namespace, ""), FLAME.Parser.JSON.encode!(pod))
+    created_pod = HTTP.post!(http, pod_path(namespace, ""), JSON.encode!(pod))
     name = created_pod["metadata"]["name"]
     wait_until_scheduled(http, namespace, name, timeout)
   end
