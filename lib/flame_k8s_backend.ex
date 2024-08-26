@@ -203,7 +203,7 @@ defmodule FLAMEK8sBackend do
             runner_pod_manifest:
               RunnerPodTemplate.manifest(
                 base_pod,
-                opts[:runner_pod_tpl],
+                provided_opts[:runner_pod_tpl],
                 parent_ref,
                 Keyword.take(provided_opts, [:app_container_name, :omit_owner_reference])
               )
