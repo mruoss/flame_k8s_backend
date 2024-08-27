@@ -162,6 +162,17 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   >   * The container `image` (set to the image of the parent pod's app
   >     container)
 
+  > #### Automatically Defined Environment Variables {: .info}
+  >
+  > Some environment variables are defined automatically on the
+  > runner pod:
+  >
+  >   * `POD_IP` is set to the runner Pod's IP address (`.status.podIP`) - (not overridable)
+  >   * `POD_NAME` is set to the runner Pod's name (`.metadata.name`) - (not overridable)
+  >   * `POD_NAMESPACE` is set to the runner Pod's namespace (`.metadata.namespace`) - (not overridable)
+  >   * `PHX_SERVER` is set to `false` (overridable)
+  >   * `FLAME_PARENT` used internally by FLAME - (not overridable)
+
   ### Options
 
   * `:omit_owner_reference` - Omit generating and appending the parent pod as
@@ -175,6 +186,20 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
 
   defstruct [:env, :resources, add_parent_env: true]
 
+  @typedoc """
+  Describing the Runner Pod Template struct
+
+  ### Fields
+
+  * `env` - a map describing a Pod environment variable declaration
+    `%{"name" => "MY_ENV_VAR", "value" => "my_env_var_value"}`
+
+  * `resources` - Pod resource requests and limits.
+
+  * `add_parent_env` - If true, all env vars of the main container
+    including `envFrom` are copied to the runner pod.
+    default: `true`
+  """
   @type t :: %__MODULE__{
           env: map() | nil,
           resources: map() | nil,
@@ -295,7 +320,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
           %{"name" => "FLAME_PARENT", "value" => encoded_parent}
           | Enum.reject(
               env,
-              &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE"])
+              &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
             )
         ]
       end)
