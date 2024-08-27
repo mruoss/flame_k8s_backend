@@ -44,6 +44,9 @@ defmodule FLAMEK8sBackend.TestSupport.Pods do
         value: name
       - name: RELEASE_NODE
         value: flame_test@$(POD_IP)
+      envFrom:
+      - configMapRef:
+          name: some-config-map
       image: flame-test-image:0.1.0
       imagePullPolicy: IfNotPresent
       name: flame

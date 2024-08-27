@@ -101,39 +101,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   end
   ```
 
-  ### Advanced Use Case - Passing a Callback Function
-
-  In some cases you might need advanced control over the runner pod manifest.
-  Maybe you want to set node affinity because you need your runners to run on
-  nodes with GPUs or you need additional volumes etc. In this case, you can pass
-  a callback via `runner_pod_tpl` option to the `FLAMEK8sBackend`.
-
-  The callback has to be of type
-  `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0`. The callback will be called
-  with the manifest of the parent pod which can be used to extract information.
-  It should return a pod template as a map
-
-  Define a callback, e.g. in a separate module:
-
-  ```
-  defmodule MyApp.FLAMERunnerPodTemplate do
-    def runner_pod_manifest(parent_pod_manifest) do
-      %{
-        "metadata" => %{
-          # namespace, labels, ownerReferences,...
-        },
-        "spec" => %{
-          "containers" => [
-            %{
-              # container definition
-            }
-          ]
-        }
-      }
-    end
-  end
-  ```
-
   Register the backend:
 
   ```
@@ -162,6 +129,17 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   >   * The container `image` (set to the image of the parent pod's app
   >     container)
 
+  > #### Automatically Defined Environment Variables {: .info}
+  >
+  > Some environment variables are defined automatically on the
+  > runner pod:
+  >
+  >   * `POD_IP` is set to the runner Pod's IP address (`.status.podIP`) - (not overridable)
+  >   * `POD_NAME` is set to the runner Pod's name (`.metadata.name`) - (not overridable)
+  >   * `POD_NAMESPACE` is set to the runner Pod's namespace (`.metadata.namespace`) - (not overridable)
+  >   * `PHX_SERVER` is set to `false` (overridable)
+  >   * `FLAME_PARENT` used internally by FLAME - (not overridable)
+
   ### Options
 
   * `:omit_owner_reference` - Omit generating and appending the parent pod as
@@ -175,6 +153,20 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
 
   defstruct [:env, :resources, add_parent_env: true]
 
+  @typedoc """
+  Describing the Runner Pod Template struct
+
+  ### Fields
+
+  * `env` - a map describing a Pod environment variable declaration
+    `%{"name" => "MY_ENV_VAR", "value" => "my_env_var_value"}`
+
+  * `resources` - Pod resource requests and limits.
+
+  * `add_parent_env` - If true, all env vars of the main container
+    including `envFrom` are copied to the runner pod.
+    default: `true`
+  """
   @type t :: %__MODULE__{
           env: map() | nil,
           resources: map() | nil,
@@ -208,10 +200,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
     app_container = app_container(parent_pod_manifest, opts)
     env = template_opts.env || []
 
-    parent_env =
-      if template_opts.add_parent_env,
-        do: app_container["env"],
-        else: []
+    parent_env = if template_opts.add_parent_env, do: app_container["env"]
+    parent_env_from = if template_opts.add_parent_env, do: app_container["envFrom"]
 
     runner_pod_template = %{
       "metadata" => %{
@@ -221,7 +211,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
         "containers" => [
           %{
             "resources" => template_opts.resources || app_container["resources"],
-            "env" => env ++ parent_env
+            "env" => env ++ List.wrap(parent_env),
+            "envFrom" => List.wrap(parent_env_from)
           }
         ]
       }
@@ -272,35 +263,46 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       |> Map.put("ownerReferences", object_references)
     end)
     |> put_in(~w(spec restartPolicy), "Never")
-    |> put_in(~w(spec serviceAccount), parent_pod_manifest["spec"]["serviceAccount"])
-    |> update_in(["spec", "containers", Access.at(0)], fn container ->
-      container
-      |> Map.put("image", app_container["image"])
-      |> Map.put("name", "runner")
-      |> Map.put_new("env", [])
-      |> Map.update!("env", fn env ->
-        [
-          %{
-            "name" => "POD_NAME",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.name"}}
-          },
-          %{
-            "name" => "POD_IP",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "status.podIP"}}
-          },
-          %{
-            "name" => "POD_NAMESPACE",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
-          },
-          %{"name" => "PHX_SERVER", "value" => "false"},
-          %{"name" => "FLAME_PARENT", "value" => encoded_parent}
-          | Enum.reject(
-              env,
-              &(&1["name"] in ["FLAME_BACKEND", "POD_NAME", "POD_NAMESPACE"])
-            )
-        ]
+    |> update_in(~w(spec), fn spec ->
+      spec
+      |> Map.put("restartPolicy", "Never")
+      |> Map.put_new("serviceAccount", parent_pod_manifest["spec"]["serviceAccount"])
+      |> update_in(["containers", Access.at(0)], fn container ->
+        container
+        |> Map.put("image", app_container["image"])
+        |> Map.put("name", "runner")
+        |> Map.put_new("env", [])
+        |> Map.update!("env", fn env ->
+          [
+            %{
+              "name" => "POD_NAME",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.name"}}
+            },
+            %{
+              "name" => "POD_IP",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "status.podIP"}}
+            },
+            %{
+              "name" => "POD_NAMESPACE",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
+            },
+            %{"name" => "FLAME_PARENT", "value" => encoded_parent}
+            | Enum.reject(
+                env,
+                &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
+              )
+          ]
+          |> put_new_env("PHX_SERVER", "false")
+        end)
       end)
     end)
+  end
+
+  defp put_new_env(env, name, value) do
+    case get_in(env, [Access.filter(&(&1["name"] == name))]) do
+      [] -> [%{"name" => name, "value" => value} | env]
+      _ -> env
+    end
   end
 
   defp app_container(parent_pod_manifest, opts) do

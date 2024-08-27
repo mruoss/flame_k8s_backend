@@ -48,7 +48,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
         )
       end
 
-      MUT.manifest(parent_pod_manifest, callback, make_ref())
+      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
+      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
     end
 
     test "should return pod manifest with data form callback", %{
@@ -64,6 +65,9 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                 limits:
                   memory: 500Mi
                   cpu: 500
+              env:
+                - name: PHX_SERVER
+                  value: "true"
         """
         |> put_in(
           app_container_access(~w(resources requests)),
@@ -73,6 +77,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
       pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
 
+      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["true"]
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
       assert get_in(pod_manifest, app_container_access(~w(resources limits memory))) == "500Mi"
     end
@@ -182,6 +187,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
+
+      assert get_in(pod_manifest, app_container_access("envFrom")) == [
+               %{"configMapRef" => %{"name" => "some-config-map"}}
+             ]
     end
 
     test "Only default envs if add_parent_env is set to false", %{
@@ -193,6 +202,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
+      assert get_in(pod_manifest, app_container_access("envFrom")) == []
+
       parent = flame_parent(pod_manifest)
       assert parent.ref == ref
     end
@@ -207,6 +218,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
+
+      assert get_in(pod_manifest, app_container_access("envFrom")) == [
+               %{"configMapRef" => %{"name" => "some-config-map"}}
+             ]
     end
 
     test "No parent envs if add_parent_env is set to false", %{
@@ -217,6 +232,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == []
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
+      assert get_in(pod_manifest, app_container_access("envFrom")) == []
     end
   end
 
