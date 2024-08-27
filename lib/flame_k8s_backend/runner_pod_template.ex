@@ -208,10 +208,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
     app_container = app_container(parent_pod_manifest, opts)
     env = template_opts.env || []
 
-    parent_env =
-      if template_opts.add_parent_env,
-        do: app_container["env"],
-        else: []
+    parent_env = if template_opts.add_parent_env, do: app_container["env"]
+    parent_env_from = if template_opts.add_parent_env, do: app_container["envFrom"]
 
     runner_pod_template = %{
       "metadata" => %{
@@ -221,7 +219,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
         "containers" => [
           %{
             "resources" => template_opts.resources || app_container["resources"],
-            "env" => env ++ parent_env
+            "env" => env ++ List.wrap(parent_env),
+            "envFrom" => List.wrap(parent_env_from)
           }
         ]
       }
