@@ -286,16 +286,23 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
               "name" => "POD_NAMESPACE",
               "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
             },
-            %{"name" => "PHX_SERVER", "value" => "false"},
             %{"name" => "FLAME_PARENT", "value" => encoded_parent}
             | Enum.reject(
                 env,
                 &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
               )
           ]
+          |> put_new_env("PHX_SERVER", "false")
         end)
       end)
     end)
+  end
+
+  defp put_new_env(env, name, value) do
+    case get_in(env, [Access.filter(&(&1["name"] == name))]) do
+      [] -> [%{"name" => name, "value" => value} | env]
+      _ -> env
+    end
   end
 
   defp app_container(parent_pod_manifest, opts) do
