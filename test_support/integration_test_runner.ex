@@ -9,8 +9,12 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
         name: IntegrationTest.Runner,
         min: 0,
         max: 2,
-        idle_shutdown_after: 1_000,
+        max_concurrency: 10,
+        boot_timeout: :timer.minutes(3),
+        idle_shutdown_after: :timer.minutes(1),
+        timeout: :infinity,
         backend: FLAMEK8sBackend,
+        track_resources: true,
         log: :debug
         }]
 
