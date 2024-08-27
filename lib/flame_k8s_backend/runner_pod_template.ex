@@ -101,39 +101,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   end
   ```
 
-  ### Advanced Use Case - Passing a Callback Function
-
-  In some cases you might need advanced control over the runner pod manifest.
-  Maybe you want to set node affinity because you need your runners to run on
-  nodes with GPUs or you need additional volumes etc. In this case, you can pass
-  a callback via `runner_pod_tpl` option to the `FLAMEK8sBackend`.
-
-  The callback has to be of type
-  `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0`. The callback will be called
-  with the manifest of the parent pod which can be used to extract information.
-  It should return a pod template as a map
-
-  Define a callback, e.g. in a separate module:
-
-  ```
-  defmodule MyApp.FLAMERunnerPodTemplate do
-    def runner_pod_manifest(parent_pod_manifest) do
-      %{
-        "metadata" => %{
-          # namespace, labels, ownerReferences,...
-        },
-        "spec" => %{
-          "containers" => [
-            %{
-              # container definition
-            }
-          ]
-        }
-      }
-    end
-  end
-  ```
-
   Register the backend:
 
   ```
