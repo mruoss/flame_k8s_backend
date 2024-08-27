@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+### Added
+
+- `FLAMEK8sBackend.RunnerPodTemplate`: Set `.metadata.namespace` and `.metadata.generateName` on runner pod if not set ([#43](https://github.com/mruoss/flame_k8s_backend/pull/43))
+
 ## [0.4.3] - 2024-08-22
 
 ### Fixed
