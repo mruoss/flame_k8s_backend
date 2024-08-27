@@ -12,9 +12,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.5.0] - 2024-08-27
+
+### Fixed
+
+- `FLAMEK8sBackend.RunnerPodTemplate`: Only set `PHX_SERVER` if it is not passed.
+- `FLAMEK8sBackend.RunnerPodTemplate`: Reject `FLAME_PARENT`, not `FLAME_BACKEND` in passed env vars.
+
 ### Added
 
 - `FLAMEK8sBackend.RunnerPodTemplate`: Set `.metadata.namespace` and `.metadata.generateName` on runner pod if not set ([#43](https://github.com/mruoss/flame_k8s_backend/pull/43))
+
+### Changed
+
+- `FLAMEK8sBackend.RunnerPodTemplate`: Also copy `env_from` if `add_parent_env` is `true`
+- Improve documentation
 
 ## [0.4.3] - 2024-08-22
 
