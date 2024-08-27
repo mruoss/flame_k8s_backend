@@ -296,33 +296,37 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       |> Map.put("ownerReferences", object_references)
     end)
     |> put_in(~w(spec restartPolicy), "Never")
-    |> put_in(~w(spec serviceAccount), parent_pod_manifest["spec"]["serviceAccount"])
-    |> update_in(["spec", "containers", Access.at(0)], fn container ->
-      container
-      |> Map.put("image", app_container["image"])
-      |> Map.put("name", "runner")
-      |> Map.put_new("env", [])
-      |> Map.update!("env", fn env ->
-        [
-          %{
-            "name" => "POD_NAME",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.name"}}
-          },
-          %{
-            "name" => "POD_IP",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "status.podIP"}}
-          },
-          %{
-            "name" => "POD_NAMESPACE",
-            "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
-          },
-          %{"name" => "PHX_SERVER", "value" => "false"},
-          %{"name" => "FLAME_PARENT", "value" => encoded_parent}
-          | Enum.reject(
-              env,
-              &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
-            )
-        ]
+    |> update_in(~w(spec), fn spec ->
+      spec
+      |> Map.put("restartPolicy", "Never")
+      |> Map.put_new("serviceAccount", parent_pod_manifest["spec"]["serviceAccount"])
+      |> update_in(["containers", Access.at(0)], fn container ->
+        container
+        |> Map.put("image", app_container["image"])
+        |> Map.put("name", "runner")
+        |> Map.put_new("env", [])
+        |> Map.update!("env", fn env ->
+          [
+            %{
+              "name" => "POD_NAME",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.name"}}
+            },
+            %{
+              "name" => "POD_IP",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "status.podIP"}}
+            },
+            %{
+              "name" => "POD_NAMESPACE",
+              "valueFrom" => %{"fieldRef" => %{"fieldPath" => "metadata.namespace"}}
+            },
+            %{"name" => "PHX_SERVER", "value" => "false"},
+            %{"name" => "FLAME_PARENT", "value" => encoded_parent}
+            | Enum.reject(
+                env,
+                &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
+              )
+          ]
+        end)
       end)
     end)
   end
