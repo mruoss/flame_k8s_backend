@@ -244,6 +244,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
          opts
        ) do
     parent_pod_manifest_name = parent_pod_manifest["metadata"]["name"]
+    parent_pod_manifest_namespace = parent_pod_manifest["metadata"]["namespace"]
 
     object_references =
       if opts[:omit_owner_reference],
@@ -263,8 +264,13 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
 
     runner_pod_template
     |> Map.merge(%{"apiVersion" => "v1", "kind" => "Pod"})
-    |> put_in(~w(metadata generateName), parent_pod_manifest_name <> "-")
-    |> put_in(~w(metadata ownerReferences), object_references)
+    |> update_in([Access.key("metadata", %{})], fn metadata ->
+      metadata
+      |> Map.delete("name")
+      |> Map.put_new("generateName", parent_pod_manifest_name <> "-")
+      |> Map.put_new("namespace", parent_pod_manifest_namespace)
+      |> Map.put("ownerReferences", object_references)
+    end)
     |> put_in(~w(spec restartPolicy), "Never")
     |> put_in(~w(spec serviceAccount), parent_pod_manifest["spec"]["serviceAccount"])
     |> update_in(["spec", "containers", Access.at(0)], fn container ->
