@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.5.2] - 2024-08-29
+
+### Added
+
+- `FLAMEK8sBackend.RunnerPodTemplate`: Allow BYO pod template to be a binary.
+
 ## [0.5.1] - 2024-08-28
 
 ### Changed
