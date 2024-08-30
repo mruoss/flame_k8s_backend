@@ -43,10 +43,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   `runner_pod_tpl` to either a map representing the Pod manifest or a callback
   function as described below.
 
-  #### Using a Manifest Map or Binary
+  #### Using a Manifest Map
 
-  You can set `runner_pod_tpl` to a map or a YAML string representing the
-  manifest of the runner Pod:
+  You can set `runner_pod_tpl` to a map representing the manifest of the runner
+  Pod:
 
 
   ```
@@ -225,15 +225,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       when is_map(runner_pod_template) do
     app_container = app_container(parent_pod_manifest, opts)
     apply_defaults(runner_pod_template, parent_pod_manifest, app_container, parent_ref, opts)
-  end
-
-  def manifest(parent_pod_manifest, runner_pod_template, parent_ref, opts)
-      when is_binary(runner_pod_template) do
-    app_container = app_container(parent_pod_manifest, opts)
-
-    runner_pod_template
-    |> YamlElixir.read_from_string!()
-    |> apply_defaults(parent_pod_manifest, app_container, parent_ref, opts)
   end
 
   defp apply_defaults(
