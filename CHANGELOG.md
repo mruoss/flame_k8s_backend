@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.5.4] - 2024-09-11
+
+### Changed
+
+- Upgrade to FLAME 0.5.0
+
 ## [0.5.3] - 2024-08-30
 
 ### Changed
