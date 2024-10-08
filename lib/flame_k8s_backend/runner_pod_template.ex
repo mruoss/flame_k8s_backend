@@ -293,10 +293,15 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
               )
           ]
           |> put_new_env("PHX_SERVER", "false")
+          |> put_new_env("RELEASE_SECRET", Node.get_cookie())
+          |> put_new_env("RELEASE_DISTRIBUTION", "name")
+          |> put_new_env("RELEASE_NODE", "flame_runner@$(POD_IP)")
         end)
       end)
     end)
   end
+
+  defp put_new_env(env, _name, :nocookie), do: env
 
   defp put_new_env(env, name, value) do
     case get_in(env, [Access.filter(&(&1["name"] == name))]) do
