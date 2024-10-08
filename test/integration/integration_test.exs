@@ -8,24 +8,35 @@ defmodule FlameK8sBackend.IntegrationTest do
     if not (clusters_out
             |> String.split("\n", trim: true)
             |> Enum.member?("flame-integration-test")) do
-      exit_code = Mix.Shell.IO.cmd("kind create cluster --name flame-integration-test")
+      exit_code =
+        System.cmd("kind", ~w(create cluster --name flame-integration-test),
+          stderr_to_stdout: true
+        )
+
       assert 0 == exit_code, "Could not create kind cluster 'flame-integration-test'"
     end
 
-    Mix.Shell.IO.cmd(
-      "docker build -f test/integration/Dockerfile . -t flamek8sbackend:integration"
+    System.cmd(
+      "docker",
+      ~w(build -f test/integration/Dockerfile . -t flamek8sbackend:integration),
+      stderr_to_stdout: true
     )
 
-    Mix.Shell.IO.cmd(
-      "kind load docker-image --name flame-integration-test flamek8sbackend:integration"
+    System.cmd(
+      "kind",
+      ~w(load docker-image --name flame-integration-test flamek8sbackend:integration),
+      stderr_to_stdout: true
     )
 
-    Mix.Shell.IO.cmd("kubectl config set-context --current kind-flame-integration-test")
-    Mix.Shell.IO.cmd("kubectl delete -f test/integration/manifest.yaml")
-    Mix.Shell.IO.cmd("kubectl apply -f test/integration/manifest.yaml")
+    System.cmd("kubectl", ~w(config set-context --current kind-flame-integration-test),
+      stderr_to_stdout: true
+    )
+
+    System.cmd("kubectl", ~w(delete -f test/integration/manifest.yaml), stderr_to_stdout: true)
+    System.cmd("kubectl", ~w(apply -f test/integration/manifest.yaml), stderr_to_stdout: true)
 
     on_exit(fn ->
-      Mix.Shell.IO.cmd("kubectl delete -f test/integration/manifest.yaml")
+      System.cmd("kubectl", ~w(delete -f test/integration/manifest.yaml), stderr_to_stdout: true)
     end)
 
     :ok
@@ -46,9 +57,19 @@ defmodule FlameK8sBackend.IntegrationTest do
     end
   end
 
+  # Integration test setup builds a docker image which starts the FLAME pools
+  # defined in FlameK8sBackend.IntegrationTestRunner and starts a runner for
+  #  each pool. It then logs the result. These checks "just" check that the logs
+  #  statements are actually visible on the pod logs:
   @tag :integration
-  test "check the logs" do
+  test "Pod shows the log statement with the result of the first runner " do
     assert :ok == assert_logs_eventually(~r/Result is :flame_ok/, 30_000),
+           "Logs were not found"
+  end
+
+  @tag :integration
+  test "Pod shows the log statement with the result of the first runner" do
+    assert :ok == assert_logs_eventually(~r/Result is "foobar"/, 30_000),
            "Logs were not found"
   end
 end

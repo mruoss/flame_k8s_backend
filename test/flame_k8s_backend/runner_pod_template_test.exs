@@ -49,7 +49,11 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       end
 
       pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
+
+      # sets defaults for required ENV vars:
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
+      assert get_in(pod_manifest, env_var_access("RELEASE_DISTRIBUTION")) == ["name"]
+      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_runner@$(POD_IP)"]
     end
 
     test "should return pod manifest with data form callback", %{
@@ -230,7 +234,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       template_opts = %MUT{env: [%{"name" => "FOO", "value" => "bar"}], add_parent_env: false}
       pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
 
-      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == []
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
       assert get_in(pod_manifest, app_container_access("envFrom")) == []
     end

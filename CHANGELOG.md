@@ -10,9 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
-<!--------------------- Don't add new entries after this line --------------------->
+### Fixed
+
+- Set `RELEASE_COOKIE`, `RELEASE_DISTRIBUTION` and `RELEASE_NODE` on runner pod if not set [#50](https://github.com/mruoss/flame_k8s_backend/issues/50), [#53](https://github.com/mruoss/flame_k8s_backend/pull/53)
 
 ## [0.5.4] - 2024-09-11
+
+<!--------------------- Don't add new entries after this line --------------------->
 
 ### Changed
 
