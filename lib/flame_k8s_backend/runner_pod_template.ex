@@ -293,7 +293,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
               )
           ]
           |> put_new_env("PHX_SERVER", "false")
-          |> put_new_env("RELEASE_SECRET", Node.get_cookie())
+          |> put_new_env("RELEASE_COOKIE", Node.get_cookie())
           |> put_new_env("RELEASE_DISTRIBUTION", "name")
           |> put_new_env("RELEASE_NODE", "flame_runner@$(POD_IP)")
         end)

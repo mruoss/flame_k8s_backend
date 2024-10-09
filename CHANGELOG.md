@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.5.6] - 2024-10-09
+
+### Fixed
+
+- Set `RELEASE_COOKIE` instead of `RELEASE_SECRET`
+
 ## [0.5.5] - 2024-10-08
 
 ### Fixed
