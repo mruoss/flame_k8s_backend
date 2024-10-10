@@ -151,3 +151,13 @@ information from the running Pod like the container image, resource requests and
 limits, environment variables etc. This information is then used to build the
 manifest for the runner pod. The backend then sends the resulting manifest to
 the API server in order to spin up a runner pod.
+
+## Troubleshooting
+
+### My runner Pod disappears / gets killed after only a few seconds
+
+If your parent is part of a Deployment, make sure your FLAME runner Pod doesn't
+contain the labels you used as selectors (i.e. `.spec.selector` on your
+Deployment). Otherwise the replica controller sees your FLAME runner as an
+additional Pod to the Deployment's ReplicaSet and "downscales" the deployment to
+the desired replica count (i.e. snipes your runner Pod).
