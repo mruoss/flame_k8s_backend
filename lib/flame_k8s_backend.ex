@@ -162,10 +162,11 @@ defmodule FLAMEK8sBackend do
             runner_pod_tpl: nil,
             boot_timeout: nil,
             remote_terminator_pid: nil,
+            omit_owner_reference: false,
             log: false,
             http: nil
 
-  @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log boot_timeout)a
+  @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log boot_timeout omit_owner_reference)a
   @required_config ~w()a
 
   @impl true
