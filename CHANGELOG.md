@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!--------------------- Don't add new entries after this line --------------------->
 
+## [0.5.7] - 2024-12-05
+
+### Fixed
+
+- Allow callers to set omit_owner_reference option [#59](https://github.com/mruoss/flame_k8s_backend/pull/59)
+
 ## [0.5.6] - 2024-10-09
 
 ### Fixed
