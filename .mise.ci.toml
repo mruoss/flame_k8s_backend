@@ -1,2 +1,2 @@
 [env]
-TEST_CLUSTER_NAME = "kind"
+TEST_K8S_CLUSTER = "kind"

@@ -1,9 +1,10 @@
 
-FROM hexpm/elixir:1.17.2-erlang-27.0.1-debian-bullseye-20240722-slim
+FROM hexpm/elixir:1.18.4-erlang-28.0.1-debian-bullseye-20250630-slim
 
 ENV MIX_ENV=test \
     MIX_HOME=/opt/mix \
-    HEX_HOME=/opt/hex
+    HEX_HOME=/opt/hex \
+    DIAGNOSTIC=1
 
 RUN mix local.hex --force && \
     mix local.rebar --force && \
