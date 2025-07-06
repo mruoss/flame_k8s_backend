@@ -13,6 +13,7 @@ defmodule FlameK8sBackend.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
+      test_coverage: [tool: ExCoveralls],
       docs: [
         main: "readme",
         extras: ["README.md", "CHANGELOG.md"],
@@ -36,7 +37,8 @@ defmodule FlameK8sBackend.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:yaml_elixir, "~> 2.9", only: [:dev, :test], runtime: false}
+      {:yaml_elixir, "~> 2.9", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

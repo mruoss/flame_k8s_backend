@@ -1,19 +1,19 @@
 defmodule FlameK8sBackend.IntegrationTest do
   use ExUnit.Case
 
+  @k8s_cluster System.get_env("TEST_K8S_CLUSTER", "flame-integration-test")
+
   setup_all do
     {clusters_out, exit_code} = System.cmd("kind", ~w(get clusters))
     assert 0 == exit_code, "kind is not installed. Please install kind."
 
     if not (clusters_out
             |> String.split("\n", trim: true)
-            |> Enum.member?("flame-integration-test")) do
-      exit_code =
-        System.cmd("kind", ~w(create cluster --name flame-integration-test),
-          stderr_to_stdout: true
-        )
+            |> Enum.member?(@k8s_cluster)) do
+      {_, exit_code} =
+        System.cmd("kind", ["create", "cluster", "--name", @k8s_cluster], stderr_to_stdout: true)
 
-      assert 0 == exit_code, "Could not create kind cluster 'flame-integration-test'"
+      assert 0 == exit_code, "Could not create kind cluster '#{@k8s_cluster}'"
     end
 
     System.cmd(
@@ -24,11 +24,11 @@ defmodule FlameK8sBackend.IntegrationTest do
 
     System.cmd(
       "kind",
-      ~w(load docker-image --name flame-integration-test flamek8sbackend:integration),
+      ~w(load docker-image --name #{@k8s_cluster} flamek8sbackend:integration),
       stderr_to_stdout: true
     )
 
-    System.cmd("kubectl", ~w(config set-context --current kind-flame-integration-test),
+    System.cmd("kubectl", ~w(config set-context --current kind-#{@k8s_cluster}),
       stderr_to_stdout: true
     )
 

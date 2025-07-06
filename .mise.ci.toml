@@ -1,0 +1,2 @@
+[env]
+TEST_CLUSTER_NAME = "kind"
