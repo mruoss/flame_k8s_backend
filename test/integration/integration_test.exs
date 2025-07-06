@@ -16,24 +16,29 @@ defmodule FlameK8sBackend.IntegrationTest do
       assert 0 == exit_code, "Could not create kind cluster '#{@k8s_cluster}'"
     end
 
-    System.cmd(
-      "docker",
-      ~w(build -f test/integration/Dockerfile . -t flamek8sbackend:integration),
-      stderr_to_stdout: true
-    )
+    {_, 0} =
+      System.cmd(
+        "docker",
+        ~w(build --memory-swap 2Gi -f test/integration/Dockerfile . -t flamek8sbackend:integration),
+        stderr_to_stdout: true
+      )
 
-    System.cmd(
-      "kind",
-      ~w(load docker-image --name #{@k8s_cluster} flamek8sbackend:integration),
-      stderr_to_stdout: true
-    )
+    {_, 0} =
+      System.cmd(
+        "kind",
+        ["load", "docker-image", "--name", @k8s_cluster, "flamek8sbackend:integration"],
+        stderr_to_stdout: true
+      )
 
-    System.cmd("kubectl", ~w(config set-context --current kind-#{@k8s_cluster}),
-      stderr_to_stdout: true
-    )
+    {_, 0} =
+      System.cmd("kubectl", ["config", "use-context", "kind-#{@k8s_cluster}"],
+        stderr_to_stdout: true
+      )
 
     System.cmd("kubectl", ~w(delete -f test/integration/manifest.yaml), stderr_to_stdout: true)
-    System.cmd("kubectl", ~w(apply -f test/integration/manifest.yaml), stderr_to_stdout: true)
+
+    {_, 0} =
+      System.cmd("kubectl", ~w(apply -f test/integration/manifest.yaml), stderr_to_stdout: true)
 
     on_exit(fn ->
       System.cmd("kubectl", ~w(delete -f test/integration/manifest.yaml), stderr_to_stdout: true)
