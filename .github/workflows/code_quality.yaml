@@ -4,51 +4,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-
-env:
-  MIX_ENV: test
-
 jobs:
-  code-quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Setup elixir
-        id: beam
-        uses: erlef/setup-beam@v1
-        with:
-          version-file: .tool-versions
-          version-type: strict
-          install-rebar: true
-          install-hex: true
-
-      - name: Retrieve Build Cache
-        uses: actions/cache@v4
-        id: build-folder-cache
-        with:
-          path: _build/test
-          key: ${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-build-test-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
-
-      - name: Retrieve Mix Dependencies Cache
-        uses: actions/cache@v4
-        id: mix-cache
-        with:
-          path: deps
-          key: ${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-mix-${{ hashFiles(format('{0}{1}', github.workspace, '/mix.lock')) }}
-
-      - name: Install Mix Dependencies
-        run: mix deps.get
-
-      - name: Check Formatting
-        run: mix format --check-formatted
-
-      - name: Compile
-        run: MIX_ENV=test mix compile --warnings-as-errors
-
-      - name: Unit Tests
-        run: MIX_ENV=test mix test
-
-      - name: Run Credo
-        run: MIX_ENV=test mix credo --strict
+  code_quality:
+    uses: mruoss/action_elixir_run_tests/.github/workflows/elixir-code-quality.yml@v1.3.0
+    with:
+      checkout: true
+      with-kubernetes: true
+      check-formatting: true
+      run-credo: strict
+      run-dialyzer: false
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
