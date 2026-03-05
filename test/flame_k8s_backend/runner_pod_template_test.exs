@@ -250,4 +250,32 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
     end
   end
+
+  describe "manifest/2 with :env opt" do
+    test "adds extra env vars to the runner pod", %{
+      parent_pod_manifest_full: parent_pod_manifest
+    } do
+      pod_manifest = MUT.manifest(parent_pod_manifest, nil, make_ref(), env: %{"FOO" => "bar"})
+
+      assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
+      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
+    end
+
+    test "overrides env vars from the parent pod", %{
+      parent_pod_manifest_full: parent_pod_manifest
+    } do
+      pod_manifest =
+        MUT.manifest(parent_pod_manifest, nil, make_ref(),
+          env: %{"RELEASE_NODE" => "custom@node"}
+        )
+
+      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["custom@node"]
+    end
+
+    test "supports atom keys", %{parent_pod_manifest_full: parent_pod_manifest} do
+      pod_manifest = MUT.manifest(parent_pod_manifest, nil, make_ref(), env: %{FOO: "bar"})
+
+      assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
+    end
+  end
 end

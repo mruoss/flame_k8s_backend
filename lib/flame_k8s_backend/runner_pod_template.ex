@@ -288,7 +288,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
             },
             %{"name" => "FLAME_PARENT", "value" => encoded_parent}
             | Enum.reject(
-                env,
+                put_env_from_options(env, opts),
                 &(&1["name"] in ["FLAME_PARENT", "POD_NAME", "POD_NAMESPACE", "POD_IP"])
               )
           ]
@@ -308,6 +308,18 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       [] -> [%{"name" => name, "value" => value} | env]
       _ -> env
     end
+  end
+
+  defp put_env_from_options(env, opts) do
+    env_map = Keyword.get(opts, :env, %{})
+
+    env = Enum.reject(env, &Map.has_key?(env_map, &1["name"]))
+
+    extra_env =
+      for {key, value} <- env_map,
+          do: %{"name" => to_string(key), "value" => to_string(value)}
+
+    env ++ extra_env
   end
 
   defp app_container(parent_pod_manifest, opts) do

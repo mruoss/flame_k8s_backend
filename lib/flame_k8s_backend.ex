@@ -44,6 +44,12 @@ defmodule FLAMEK8sBackend do
       are used for the runner pod.
       See `FLAMEK8sBackend.RunnerPodTemplate` for more infos.
 
+    * `:env` - a map with environment variables that should be passed to the
+      runner. When specified, these environment variables are merged into
+      `:runner_pod_tpl`. Note that you can specify environment variables
+      via `:runner_pod_tpl`, so the `:env` option is simply a convenience
+      for passing extra values read at runtime.
+
     * `:log` - The log level to use for verbose logging. Defaults to `false`.
 
   ### Prerequisites
@@ -160,13 +166,14 @@ defmodule FLAMEK8sBackend do
             parent_ref: nil,
             runner_node_name: nil,
             runner_pod_tpl: nil,
+            env: %{},
             boot_timeout: nil,
             remote_terminator_pid: nil,
             omit_owner_reference: false,
             log: false,
             http: nil
 
-  @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log boot_timeout omit_owner_reference)a
+  @valid_opts ~w(app_container_name runner_pod_tpl env terminator_sup log boot_timeout omit_owner_reference)a
   @required_config ~w()a
 
   @impl true
@@ -206,7 +213,7 @@ defmodule FLAMEK8sBackend do
                 base_pod,
                 provided_opts[:runner_pod_tpl],
                 parent_ref,
-                Keyword.take(provided_opts, [:app_container_name, :omit_owner_reference])
+                Keyword.take(provided_opts, [:env, :app_container_name, :omit_owner_reference])
               )
           )
 
