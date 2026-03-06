@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+<!--------------------- Don't add new entries after this line --------------------->
+
+## [0.6.0] - 2026-03-06
+
 This release revamps the runner pod manifest configuration. The migration steps depend on the value you are currently passing:
 
 * If you are currently passing a map or a callback to `:runner_pod_tpl`, you can simply rename the option to `:manifest` and it should maintain the current behaviour.
@@ -76,8 +80,6 @@ This release revamps the runner pod manifest configuration. The migration steps 
 
 * Removed `:runner_pod_tpl` option in favour of the the new `:manifest` option
 * Removed the `%FLAMEK8sBackend.RunnerPodTemplate{}` struct
-
-<!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.5.7] - 2024-12-05
 

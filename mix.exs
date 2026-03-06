@@ -1,7 +1,7 @@
 defmodule FlameK8sBackend.MixProject do
   use Mix.Project
   @source_url "https://github.com/mruoss/flame_k8s_backend"
-  @version "0.5.7"
+  @version "0.6.0"
 
   def project do
     [
@@ -17,6 +17,7 @@ defmodule FlameK8sBackend.MixProject do
       docs: [
         main: "readme",
         extras: ["README.md", "CHANGELOG.md"],
+        skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
         source_ref: "v#{@version}",
         source_url: @source_url
       ]
