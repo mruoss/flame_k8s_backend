@@ -1,56 +1,58 @@
 defmodule FLAMEK8sBackend do
-  @moduledoc """
+  @moduledoc ~S'''
   Kubernetes Backend implementation.
 
-  ### Usage
+  ## Usage
 
   Configure the flame backend in our configuration or application setup:
 
-  ```
-  # application.ex
-  children = [
-    {FLAME.Pool,
-      name: MyApp.SamplePool,
-      backend: FLAMEK8sBackend,
-      min: 0,
-      max: 10,
-      max_concurrency: 5,
-      idle_shutdown_after: 30_000}
-  ]
-  ```
+      # application.ex
+      children = [
+        {FLAME.Pool,
+         name: MyApp.SamplePool,
+         backend: FLAMEK8sBackend,
+         min: 0,
+         max: 10,
+         max_concurrency: 5,
+         idle_shutdown_after: 30_000}
+      ]
 
-  ### Options
+  ## Options
 
   The following backend options are supported:
+
+    * `:manifest` - If given, specifies the runner pod manifest. This can be
+      either of:
+
+        * a manifest map
+
+        * an arity-2 function - it accepts the parent pod manifest and the app
+          container part of the manifest (as determined by the `:app_container_name`
+          option)
+
+      See the "Manifest configuration" section below for more details.
+
+    * `:env` - A map with environment variables that should be passed to the
+      runner. When specified, these environment variables take precendence over
+      the ones defined in `:manifest`. This option is a convenience for passing
+      extra values read at runtime.
 
     * `:app_container_name` - If your application pod runs multiple containers
       (initContainers excluded), use this option to pass the name of the
       container running this application. If not given, the first container
-      in the list of containers is used to lookup the contaienr image, env vars
-      and resources to be used for the runner pods.
+      in the list of containers is used to lookup the container image to be used
+      for the runner pods.
 
     * `:omit_owner_reference` - If true, no ownerReferences are configured on
       the runner pods. Defaults to `false`
 
-    * `:runner_pod_tpl` - If given, controls how the runner pod manifest is
-      generated. Can be a function of type
-      `t:FLAMEK8sBackend.RunnerPodTemplate.callback/0` or a struct of type
-      `t:FLAMEK8sBackend.RunnerPodTemplate.t/0`.
-      A callback receives the manifest of the parent pod as a map and should
-      return the runner pod's manifest as a map().
-      If a struct is given, the runner pod's manifest will be generated with
-      values from the struct if given or from the parent pod if omitted.
-      If this option is omitted, the parent pod's `env` and `resources`
-      are used for the runner pod.
-      See `FLAMEK8sBackend.RunnerPodTemplate` for more infos.
-
     * `:log` - The log level to use for verbose logging. Defaults to `false`.
 
-  ### Prerequisites
+  ## Prerequisites
 
   In order for this to work, your application needs to meet some requirements.
 
-  #### Env Variables
+  ### Env Variables
 
   In order for the backend to be able to get informations from your pod and use
   them for  the runner pods (e.g. env variables), you have to define `POD_NAME`
@@ -79,7 +81,7 @@ defmodule FLAMEK8sBackend do
                 fieldPath: metadata.namespace
   ```
 
-  #### RBAC
+  ### RBAC
 
   Your application needs run as a service account with permissions to manage
   pods. This is a simple
@@ -124,7 +126,7 @@ defmodule FLAMEK8sBackend do
         serviceAccountName: my-app
   ```
 
-  #### Clustering
+  ### Clustering
 
   Your application needs to be able to form a cluster with your runners. Define
   `POD_IP`, `RELEASE_DISTRIBUTION` and `RELEASE_NODE` environment variables on
@@ -148,7 +150,117 @@ defmodule FLAMEK8sBackend do
           - name: RELEASE_NODE
             value: my_app@$(POD_IP)
   ```
-  """
+
+  ## Manifest Configuration
+
+  You have full control over the runner pod manifest. For example, to set some
+  environment variables and resources, you can do the following:
+
+      manifest = %{
+        "spec" => %{
+          "containers" => [
+            %{
+              "env" => [
+                %{"name" => "FOO", "value" => "bar"}
+              ],
+              "resources" => %{
+                "requests" => %{"memory" => "256Mi", "cpu" => "100m"},
+                "limits" => %{"memory" => "256Mi", "cpu" => "400m"}
+              }
+            }
+          ]
+        }
+      }
+
+      {FLAME.Pool,
+       name: MyApp.SamplePool,
+       backend: {FLAMEK8sBackend, manifest: manifest}}
+
+  For more complex manifests, it is convenient to write the manifest as YAML.
+  To do that, you can added the `:yaml_elixir` package, and use the `~y` sigil:
+
+      manifest = ~y"""
+      metadata:
+        spec:
+          containers:
+            - resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 256Mi
+                  cpu: 400m
+            - env:
+                - name: FOO
+                  value: bar
+      """
+
+      {FLAME.Pool,
+       name: MyApp.SamplePool,
+       backend: {FLAMEK8sBackend, manifest: manifest}}
+
+  You may want to automatically copy certain configuration from the parent pod.
+  To do that, you can pass a function to build the manifest:
+
+      manifest_fun = fn parent_pod_manifest, app_container ->
+        %{
+          "metadata" => %{
+            # ...
+          },
+          "spec" => %{
+            "containers" => [
+              %{
+                # Copy all env vars and resources from the parent container definition.
+                "env" => app_container["env"] || [],
+                "envFrom" => app_container["envFrom"] || [],
+                "resources" => app_container["resources"] || %{}
+              }
+            ]
+          }
+        }
+      end
+
+      {FLAME.Pool,
+       name: MyApp.SamplePool,
+       backend: {FLAMEK8sBackend, manifest: manifest_fun}}
+
+  > #### Predefined Values {: .warning}
+  >
+  > Note that the following values are controlled by the backend and, if set in
+  > your manifest, are going to be overwritten:
+  >
+  >   * `apiVersion` and `Kind` of the resource (set to `v1/Pod`)
+  >   * The pod's and container's names (set to a combination of the parent
+  >     pod's name and a random id)
+  >   * The `restartPolicy` (set to `Never`)
+  >   * The container `image` (set to the image of the parent pod's app
+  >     container)
+
+  > #### Automatically Defined Environment Variables {: .info}
+  >
+  > Some environment variables are defined automatically on the runner pod:
+  >
+  >   * `POD_IP` is set to the runner Pod's IP address (`.status.podIP`) - (not overridable)
+  >   * `POD_NAME` is set to the runner Pod's name (`.metadata.name`) - (not overridable)
+  >   * `POD_NAMESPACE` is set to the runner Pod's namespace (`.metadata.namespace`) - (not overridable)
+  >   * `PHX_SERVER` is set to `false` - (overridable)
+  >   * `FLAME_PARENT` used internally by FLAME - (not overridable)
+  >   * `RELEASE_COOKIE` is set to the current node cookie - (overridable)
+  >   * `RELEASE_DISTRIBUTION` is set to `"name"`-  (overridable)
+  >   * `RELEASE_NODE` is set to `"flame_runner@$(POD_IP)"` - (overridable)
+
+  > #### Environment Variables Precedence {: .warning}
+  >
+  > Environment variables from multiple sources are merged, according to the
+  > following precedence:
+  >
+  >   * overridable defaults (listed above)
+  >   * env vars defined in `:manifest`
+  >   * env vars passed via the `:env` option
+  >   * non-overridable defaults (listed above)
+
+  '''
+
   @behaviour FLAME.Backend
 
   alias FLAMEK8sBackend.K8sClient
@@ -159,14 +271,15 @@ defmodule FLAMEK8sBackend do
   defstruct runner_pod_manifest: nil,
             parent_ref: nil,
             runner_node_name: nil,
-            runner_pod_tpl: nil,
+            manifest: nil,
+            env: nil,
             boot_timeout: nil,
             remote_terminator_pid: nil,
             omit_owner_reference: false,
             log: false,
             http: nil
 
-  @valid_opts ~w(app_container_name runner_pod_tpl terminator_sup log boot_timeout omit_owner_reference)a
+  @valid_opts ~w(app_container_name manifest env terminator_sup log boot_timeout omit_owner_reference)a
   @required_config ~w()a
 
   @impl true
@@ -204,9 +317,9 @@ defmodule FLAMEK8sBackend do
             runner_pod_manifest:
               RunnerPodTemplate.manifest(
                 base_pod,
-                provided_opts[:runner_pod_tpl],
+                provided_opts[:manifest] || %{},
                 parent_ref,
-                Keyword.take(provided_opts, [:app_container_name, :omit_owner_reference])
+                Keyword.take(provided_opts, [:env, :app_container_name, :omit_owner_reference])
               )
           )
 

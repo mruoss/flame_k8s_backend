@@ -6,18 +6,17 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
   def setup() do
     Application.ensure_all_started(:flame)
 
-    pod_template = %FLAMEK8sBackend.RunnerPodTemplate{
-      manifest: ~y"""
-      spec:
-        containers:
-        - env:
-          - name: "FOO"
-            value: "foo_from_manifest"
-          - name: "BAR"
-            value: "bar_from_manifest"
-      """,
-      env: [%{"name" => "BAR", "value" => "bar_from_env"}]
-    }
+    manifest = ~y"""
+    spec:
+      containers:
+      - env:
+        - name: "FOO"
+          value: "foo_from_manifest"
+        - name: "BAR"
+          value: "bar_from_manifest"
+    """
+
+    env = %{"BAR" => "bar_from_env"}
 
     children = [
       {
@@ -42,7 +41,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
         boot_timeout: :timer.minutes(3),
         idle_shutdown_after: :timer.minutes(1),
         timeout: :infinity,
-        backend: {FLAMEK8sBackend, runner_pod_tpl: pod_template},
+        backend: {FLAMEK8sBackend, manifest: manifest, env: env},
         track_resources: true,
         log: :debug
       }

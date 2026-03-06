@@ -10,17 +10,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+This release revamps the runner pod manifest configuration. The migration steps depend on the value you are currently passing:
+
+* If you are currently passing a map or a callback to `:runner_pod_tpl`, you can simply rename the option to `:manifest` and it should maintain the current behaviour.
+
+* If you are using `%FLAMEK8sBackend.RunnerPodTemplate{}` with `:env` and/or `:resources` fields, you need to convert it into a manifest map.
+
+  ```elixir
+  manifest = %{
+    "spec" => %{
+      "containers" => [
+        %{
+          "env" => [
+            %{"name" => "FOO", "value" => "bar"}
+          ],
+          "resources" => %{
+            "requests" => %{"memory" => "256Mi", "cpu" => "100m"},
+            "limits" => %{"memory" => "256Mi", "cpu" => "400m"}
+          }
+        }
+      ]
+    }
+  }
+
+  {FLAME.Pool,
+    name: MyApp.SamplePool,
+    backend: {FLAMEK8sBackend, manifest: manifest}}
+  ```
+
+  Note that, by default, using `%FLAMEK8sBackend.RunnerPodTemplate{}` implied that envs and resources were copied from the parent pod. If you want to maintain that behaviour, you can use a manifest function, as fallows:
+
+  ```elixir
+    manifest_fun = fn parent_pod_manifest, app_container ->
+      %{
+        "spec" => %{
+          "containers" => [
+            %{
+              # Copy env vars and resources from the parent container definition.
+              # For fields that you don't want to copy, you can specify the desired
+              # values here.
+              "env" => app_container["env"] || [],
+              "envFrom" => app_container["envFrom"] || [],
+              "resources" => app_container["resources"] || %{}
+            }
+          ]
+        }
+      }
+    end
+
+  {FLAME.Pool,
+    name: MyApp.SamplePool,
+    backend: {FLAMEK8sBackend, manifest: manifest_fun}}
+  ```
+
 ### Added
 
-* Added `:manifest` option to `%FLAMEK8sBackend.RunnerPodTemplate{}` for specifying pod manifest map
+* Added `:manifest` backend option
+* Added `:env` backend option for passing extra runner environment variables as a key-value map
 
-### Changed
+### Removed
 
-* When manifest map is passed in runner template and no resources are defined, the resources are copied from the parent pod monifest
-
-### Deprecated
-
-* Passing manifest map as `:runner_pod_tpl`, in favour of `%FLAMEK8sBackend.RunnerPodTemplate{manifest: ...}`
+* Removed `:runner_pod_tpl` option in favour of the the new `:manifest` option
+* Removed the `%FLAMEK8sBackend.RunnerPodTemplate{}` struct
 
 <!--------------------- Don't add new entries after this line --------------------->
 
