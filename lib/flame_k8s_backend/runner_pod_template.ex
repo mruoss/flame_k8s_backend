@@ -54,7 +54,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
       |> Map.put_new("serviceAccount", parent_pod_manifest["spec"]["serviceAccount"])
       |> update_in(["containers", Access.at(0)], fn container ->
         container
-        |> Map.put("image", app_container["image"])
+        |> Map.put_new("image", app_container["image"])
         |> Map.put("name", "runner")
         |> Map.put_new("env", [])
         |> Map.update!("env", fn env ->

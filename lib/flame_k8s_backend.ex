@@ -233,8 +233,6 @@ defmodule FLAMEK8sBackend do
   >   * The pod's and container's names (set to a combination of the parent
   >     pod's name and a random id)
   >   * The `restartPolicy` (set to `Never`)
-  >   * The container `image` (set to the image of the parent pod's app
-  >     container)
 
   > #### Automatically Defined Environment Variables {: .info}
   >

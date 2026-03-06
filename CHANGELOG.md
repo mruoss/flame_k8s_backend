@@ -68,6 +68,10 @@ This release revamps the runner pod manifest configuration. The migration steps 
 * Added `:manifest` backend option
 * Added `:env` backend option for passing extra runner environment variables as a key-value map
 
+### Changed
+
+* If a container image is specified in the runner manifest, it is no longer overridden by the parent image
+
 ### Removed
 
 * Removed `:runner_pod_tpl` option in favour of the the new `:manifest` option
