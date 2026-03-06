@@ -25,41 +25,16 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     [parent_pod_manifest_full: Pods.parent_pod_manifest_full()]
   end
 
-  describe "manifest/2 with callback" do
+  describe "manifest/2" do
     alias FLAMEK8sBackend.TestSupport.Pods
-
-    test "should pass pod manifest to callback", %{parent_pod_manifest_full: parent_pod_manifest} do
-      callback = fn manifest ->
-        assert manifest == parent_pod_manifest
-
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-        """
-        |> put_in(
-          app_container_access(~w(resources requests)),
-          get_in(manifest, app_container_access(~w(resources requests)))
-        )
-      end
-
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
-
-      # sets defaults for required ENV vars:
-      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
-      assert get_in(pod_manifest, env_var_access("RELEASE_DISTRIBUTION")) == ["name"]
-      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_runner@$(POD_IP)"]
-    end
 
     test "should return pod manifest with data form callback", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn parent_pod ->
+      callback = fn parent_manifest, app_container ->
+        assert parent_manifest == parent_pod_manifest
+        assert get_in(parent_manifest, app_container_access()) == app_container
+
         ~y"""
         metadata:
           namespace: test
@@ -70,18 +45,24 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                   memory: 500Mi
                   cpu: 500
               env:
-                - name: PHX_SERVER
-                  value: "true"
+                - name: FOO
+                  value: "bar"
         """
         |> put_in(
           app_container_access(~w(resources requests)),
-          get_in(parent_pod, app_container_access(~w(resources requests)))
+          get_in(parent_manifest, app_container_access(~w(resources requests)))
         )
       end
 
       pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
 
-      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["true"]
+      # sets defaults for required ENV vars
+      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
+      assert get_in(pod_manifest, env_var_access("RELEASE_DISTRIBUTION")) == ["name"]
+      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_runner@$(POD_IP)"]
+
+      # from the callback
+      assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
       assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
       assert get_in(pod_manifest, app_container_access(~w(resources limits memory))) == "500Mi"
     end
@@ -89,20 +70,18 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should add default data to pod manifest", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-        """
-      end
+      manifest = ~y"""
+      metadata:
+        namespace: test
+      spec:
+        containers:
+          - resources:
+              limits:
+                memory: 500Mi
+                cpu: 500
+      """
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
+      pod_manifest = MUT.manifest(parent_pod_manifest, manifest, make_ref())
       assert get_in(pod_manifest, app_container_access() ++ ["image"]) == "flame-test-image:0.1.0"
 
       owner_references = get_in(pod_manifest, ~w(metadata ownerReferences))
@@ -115,21 +94,19 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should take data from container with given app_container_name", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-        """
-      end
+      manifest = ~y"""
+      metadata:
+        namespace: test
+      spec:
+        containers:
+          - resources:
+              limits:
+                memory: 500Mi
+                cpu: 500
+      """
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, make_ref(),
+        MUT.manifest(parent_pod_manifest, manifest, make_ref(),
           app_container_name: "other-container"
         )
 
@@ -139,115 +116,51 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should not add ownerReferences if omitted", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-        """
-      end
+      manifest = ~y"""
+      metadata:
+        namespace: test
+      spec:
+        containers:
+          - resources:
+              limits:
+                memory: 500Mi
+                cpu: 500
+      """
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, make_ref(), omit_owner_reference: true)
+        MUT.manifest(parent_pod_manifest, manifest, make_ref(), omit_owner_reference: true)
 
       assert [] == get_in(pod_manifest, ~w(metadata ownerReferences))
     end
-  end
 
-  describe "manifest/2 with map" do
-    test "Uses fields defined in pod template", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
-      pod_template = ~y"""
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        namespace: default
+    test "env precedence", %{parent_pod_manifest_full: parent_pod_manifest} do
+      manifest = ~y"""
       spec:
         containers:
-          - name: runner
-            resources:
-              requests:
-                cpu: "1"
+          - env:
+              - name: PHX_SERVER
+                value: "true"
+              - name: FOO
+                value: foo_from_manifest
+              - name: BAR
+                value: bar_from_manifest
       """
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, pod_template, make_ref())
+      env = %{"BAR" => "bar_from_env_opt", "FLAME_PARENT" => "foo"}
 
-      assert get_in(pod_manifest, app_container_access(~w(name))) == "runner"
-      assert get_in(pod_manifest, app_container_access(~w(resources requests cpu))) == "1"
-    end
-  end
-
-  describe "manifest/2 with empty %RunnerPodTemplate{} struct" do
-    test "Uses parent pod's values for empty template opts", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
-      template_opts = %MUT{}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
-
-      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
-
-      assert get_in(pod_manifest, app_container_access("envFrom")) == [
-               %{"configMapRef" => %{"name" => "some-config-map"}}
-             ]
-    end
-
-    test "Only default envs if add_parent_env is set to false", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
       ref = make_ref()
-      template_opts = %MUT{add_parent_env: false}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, ref)
+      pod_manifest = MUT.manifest(parent_pod_manifest, manifest, ref, env: env)
 
-      assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
-      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
-      assert get_in(pod_manifest, app_container_access("envFrom")) == []
+      # FOO comes from manifest, overriding the overridable default
+      assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["true"]
+      # FOO comes from manifest
+      assert get_in(pod_manifest, env_var_access("FOO")) == ["foo_from_manifest"]
+      # BAR from :env option, overriding BAR from manifest
+      assert get_in(pod_manifest, env_var_access("BAR")) == ["bar_from_env_opt"]
 
+      # FLAME_PARENT from :env is ignored, keeping the expected value
       parent = flame_parent(pod_manifest)
       assert parent.ref == ref
-    end
-  end
-
-  describe "manifest/2 with :env set in %RunnerPodTemplate{}" do
-    test "Parent pod's vars are mergd with given vars", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
-      template_opts = %MUT{env: [%{"name" => "FOO", "value" => "bar"}]}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
-
-      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
-      assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
-
-      assert get_in(pod_manifest, app_container_access("envFrom")) == [
-               %{"configMapRef" => %{"name" => "some-config-map"}}
-             ]
-    end
-
-    test "No parent envs if add_parent_env is set to false", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
-      template_opts = %MUT{env: [%{"name" => "FOO", "value" => "bar"}], add_parent_env: false}
-      pod_manifest = MUT.manifest(parent_pod_manifest, template_opts, make_ref())
-
-      assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
-      assert get_in(pod_manifest, app_container_access("envFrom")) == []
-    end
-  end
-
-  describe "manifest/2 with nil as template opts" do
-    test "Uses parent pod's values for empty template opts", %{
-      parent_pod_manifest_full: parent_pod_manifest
-    } do
-      pod_manifest = MUT.manifest(parent_pod_manifest, nil, make_ref())
-
-      assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
-
-      assert get_in(pod_manifest, env_var_access("RELEASE_NODE")) == ["flame_test@$(POD_IP)"]
     end
   end
 end

@@ -74,7 +74,8 @@ defmodule FlameK8sBackend.IntegrationTest do
 
   @tag :integration
   test "Pod shows the log statement with the result of the first runner" do
-    assert :ok == assert_logs_eventually(~r/Result is "foobar"/, 30_000),
+    assert :ok ==
+             assert_logs_eventually(~r/Result is \{"foo_from_manifest", "bar_from_env"\}/, 30_000),
            "Logs were not found"
   end
 end

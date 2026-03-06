@@ -44,6 +44,8 @@ defmodule FLAMEK8sBackend.TestSupport.Pods do
         value: name
       - name: RELEASE_NODE
         value: flame_test@$(POD_IP)
+      - name: PARENT_FOO
+        value: parent_value
       envFrom:
       - configMapRef:
           name: some-config-map

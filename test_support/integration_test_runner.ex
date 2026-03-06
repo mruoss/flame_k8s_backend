@@ -6,15 +6,17 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
   def setup() do
     Application.ensure_all_started(:flame)
 
-    pod_template_callback = fn _ ->
-      ~y"""
-      spec:
-        containers:
-        - env:
-          - name: "FOO"
-            value: "foobar"
-      """
-    end
+    manifest = ~y"""
+    spec:
+      containers:
+      - env:
+        - name: "FOO"
+          value: "foo_from_manifest"
+        - name: "BAR"
+          value: "bar_from_manifest"
+    """
+
+    env = %{"BAR" => "bar_from_env"}
 
     children = [
       {
@@ -39,7 +41,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
         boot_timeout: :timer.minutes(3),
         idle_shutdown_after: :timer.minutes(1),
         timeout: :infinity,
-        backend: {FLAMEK8sBackend, runner_pod_tpl: pod_template_callback},
+        backend: {FLAMEK8sBackend, manifest: manifest, env: env},
         track_resources: true,
         log: :debug
       }
@@ -53,7 +55,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
 
     [
       {IntegrationTest.Runner, fn -> :flame_ok end},
-      {IntegrationTest.CallbackRunner, fn -> System.get_env("FOO") end}
+      {IntegrationTest.CallbackRunner, fn -> {System.get_env("FOO"), System.get_env("BAR")} end}
     ]
     |> Enum.map(fn {pool, fun} -> Task.async(fn -> FLAME.call(pool, fun) end) end)
     |> Task.await_many(:infinity)
