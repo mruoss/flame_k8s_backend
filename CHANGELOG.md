@@ -10,6 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+### Added
+
+* Added `:manifest` option to `%FLAMEK8sBackend.RunnerPodTemplate{}` for specifying pod manifest map
+
+### Changed
+
+* When manifest map is passed in runner template and no resources are defined, the resources are copied from the parent pod monifest
+
+### Deprecated
+
+* Passing manifest map as `:runner_pod_tpl`, in favour of `%FLAMEK8sBackend.RunnerPodTemplate{manifest: ...}`
+
 <!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.5.7] - 2024-12-05

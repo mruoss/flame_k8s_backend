@@ -29,23 +29,26 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     alias FLAMEK8sBackend.TestSupport.Pods
 
     test "should pass pod manifest to callback", %{parent_pod_manifest_full: parent_pod_manifest} do
-      callback = fn manifest ->
-        assert manifest == parent_pod_manifest
+      callback = fn parent_manifest ->
+        assert parent_manifest == parent_pod_manifest
 
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-        """
-        |> put_in(
-          app_container_access(~w(resources requests)),
-          get_in(manifest, app_container_access(~w(resources requests)))
-        )
+        manifest =
+          ~y"""
+          metadata:
+            namespace: test
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: 500Mi
+                    cpu: 500
+          """
+          |> put_in(
+            app_container_access(~w(resources requests)),
+            get_in(parent_manifest, app_container_access(~w(resources requests)))
+          )
+
+        %MUT{manifest: manifest, add_parent_env: false}
       end
 
       pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
@@ -60,23 +63,26 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       parent_pod_manifest_full: parent_pod_manifest
     } do
       callback = fn parent_pod ->
-        ~y"""
-        metadata:
-          namespace: test
-        spec:
-          containers:
-            - resources:
-                limits:
-                  memory: 500Mi
-                  cpu: 500
-              env:
-                - name: PHX_SERVER
-                  value: "true"
-        """
-        |> put_in(
-          app_container_access(~w(resources requests)),
-          get_in(parent_pod, app_container_access(~w(resources requests)))
-        )
+        manifest =
+          ~y"""
+          metadata:
+            namespace: test
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: 500Mi
+                    cpu: 500
+                env:
+                  - name: PHX_SERVER
+                    value: "true"
+          """
+          |> put_in(
+            app_container_access(~w(resources requests)),
+            get_in(parent_pod, app_container_access(~w(resources requests)))
+          )
+
+        %MUT{manifest: manifest}
       end
 
       pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
@@ -89,8 +95,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should add default data to pod manifest", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
+      template = %MUT{
+        manifest: ~y"""
         metadata:
           namespace: test
         spec:
@@ -100,9 +106,9 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                   memory: 500Mi
                   cpu: 500
         """
-      end
+      }
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
+      pod_manifest = MUT.manifest(parent_pod_manifest, template, make_ref())
       assert get_in(pod_manifest, app_container_access() ++ ["image"]) == "flame-test-image:0.1.0"
 
       owner_references = get_in(pod_manifest, ~w(metadata ownerReferences))
@@ -115,8 +121,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should take data from container with given app_container_name", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
+      template = %MUT{
+        manifest: ~y"""
         metadata:
           namespace: test
         spec:
@@ -126,10 +132,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                   memory: 500Mi
                   cpu: 500
         """
-      end
+      }
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, make_ref(),
+        MUT.manifest(parent_pod_manifest, template, make_ref(),
           app_container_name: "other-container"
         )
 
@@ -139,8 +145,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "should not add ownerReferences if omitted", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      callback = fn _parent_pod ->
-        ~y"""
+      template = %MUT{
+        manifest: ~y"""
         metadata:
           namespace: test
         spec:
@@ -150,12 +156,72 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                   memory: 500Mi
                   cpu: 500
         """
-      end
+      }
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, callback, make_ref(), omit_owner_reference: true)
+        MUT.manifest(parent_pod_manifest, template, make_ref(), omit_owner_reference: true)
 
       assert [] == get_in(pod_manifest, ~w(metadata ownerReferences))
+    end
+  end
+
+  describe "manifest/2 with :resources set in %RunnerPodTemplate{}" do
+    test "resources option overrides manifest resources when both are present", %{
+      parent_pod_manifest_full: parent_pod_manifest
+    } do
+      template = %MUT{
+        manifest: ~y"""
+        spec:
+          containers:
+            - resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 200m
+                limits:
+                  memory: 256Mi
+                  cpu: 400m
+        """,
+        resources: %{"requests" => %{"memory" => "512Mi", "cpu" => "500m"}}
+      }
+
+      pod_manifest = MUT.manifest(parent_pod_manifest, template, make_ref())
+
+      assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "512Mi"
+      assert get_in(pod_manifest, app_container_access(~w(resources requests cpu))) == "500m"
+      # limits from manifest are gone since :resources entirely replaces manifest resources
+      assert get_in(pod_manifest, app_container_access(~w(resources limits))) == nil
+    end
+  end
+
+  describe "manifest/2 env precedence" do
+    test "env vars in :env option override manifest env vars, which override overridable defaults",
+         %{parent_pod_manifest_full: parent_pod_manifest} do
+      # manifest has RELEASE_NODE (overrides the default), FOO, and BAR
+      # :env option has BAR (should override BAR from manifest)
+      template = %MUT{
+        manifest: ~y"""
+        spec:
+          containers:
+            - env:
+                - name: PARENT_FOO
+                  value: child_value
+                - name: FOO
+                  value: foo_from_manifest
+                - name: BAR
+                  value: bar_from_manifest
+        """,
+        env: [%{"name" => "BAR", "value" => "bar_from_env_opt"}],
+        add_parent_env: false
+      }
+
+      pod_manifest = MUT.manifest(parent_pod_manifest, template, make_ref())
+
+      # manifest PARENT_FOO overrides the value from the parent pod manifest
+      assert get_in(pod_manifest, env_var_access("PARENT_FOO")) == ["child_value"]
+      # FOO comes from manifest
+      assert get_in(pod_manifest, env_var_access("FOO")) == ["foo_from_manifest"]
+      # BAR from :env option overrides BAR from manifest
+      assert get_in(pod_manifest, env_var_access("BAR")) == ["bar_from_env_opt"]
     end
   end
 
@@ -163,20 +229,22 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     test "Uses fields defined in pod template", %{
       parent_pod_manifest_full: parent_pod_manifest
     } do
-      pod_template = ~y"""
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        namespace: default
-      spec:
-        containers:
-          - name: runner
-            resources:
-              requests:
-                cpu: "1"
-      """
+      template = %MUT{
+        manifest: ~y"""
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          namespace: default
+        spec:
+          containers:
+            - name: runner
+              resources:
+                requests:
+                  cpu: "1"
+        """
+      }
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, pod_template, make_ref())
+      pod_manifest = MUT.manifest(parent_pod_manifest, template, make_ref())
 
       assert get_in(pod_manifest, app_container_access(~w(name))) == "runner"
       assert get_in(pod_manifest, app_container_access(~w(resources requests cpu))) == "1"
