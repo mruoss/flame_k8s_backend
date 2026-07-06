@@ -1,2 +1,7 @@
 [env]
 env_file = '.env'
+
+[tools]
+erlang = "29.0.2"
+elixir = "1.20.2"
+kind = "0.32.0"
