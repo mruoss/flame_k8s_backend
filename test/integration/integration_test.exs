@@ -19,7 +19,7 @@ defmodule FlameK8sBackend.IntegrationTest do
     {_, 0} =
       System.cmd(
         "docker",
-        ~w(build --memory-swap 2Gi -f test/integration/Dockerfile . -t flamek8sbackend:integration),
+        ~w(build --memory-swap 2g -f test/integration/Dockerfile . -t flamek8sbackend:integration),
         stderr_to_stdout: true
       )
 
