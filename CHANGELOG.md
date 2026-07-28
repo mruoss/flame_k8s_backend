@@ -10,6 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+### Added
+
+* Support for secret env variables. Env variables passed via `:secret_env` will be
+  added to a Kubernetes secret rather than passed in the Pod manifest. [#159](https://github.com/mruoss/flame_k8s_backend/pull/159)
+
+### Changed
+
+* ⚠️ With this release, the service account running the main pod needs CRUD 
+  permissions on Kubernetes secrets. Check the README for RBAC instructions.
+* Pass `RELEASE_COOKIE` via Kubernetes secret to the runner pod.
+
 <!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.6.0] - 2026-03-06
