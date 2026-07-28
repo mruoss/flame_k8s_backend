@@ -17,6 +17,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
     """
 
     env = %{"BAR" => "bar_from_env"}
+    secret_env = %{"BAR_SECRET" => "bar_from_secret"}
 
     children = [
       {
@@ -41,7 +42,7 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
         boot_timeout: :timer.minutes(3),
         idle_shutdown_after: :timer.minutes(1),
         timeout: :infinity,
-        backend: {FLAMEK8sBackend, manifest: manifest, env: env},
+        backend: {FLAMEK8sBackend, manifest: manifest, env: env, secret_env: secret_env},
         track_resources: true,
         log: :debug
       }
@@ -55,7 +56,8 @@ defmodule FlameK8sBackend.IntegrationTestRunner do
 
     [
       {IntegrationTest.Runner, fn -> :flame_ok end},
-      {IntegrationTest.CallbackRunner, fn -> {System.get_env("FOO"), System.get_env("BAR")} end}
+      {IntegrationTest.CallbackRunner,
+       fn -> {System.get_env("FOO"), System.get_env("BAR"), System.get_env("BAR_SECRET")} end}
     ]
     |> Enum.map(fn {pool, fun} -> Task.async(fn -> FLAME.call(pool, fun) end) end)
     |> Task.await_many(:infinity)

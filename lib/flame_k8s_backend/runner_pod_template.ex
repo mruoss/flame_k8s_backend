@@ -5,18 +5,23 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   @type manifest :: map()
   @type callback :: (parent_pod_manifest() -> manifest())
 
-  @spec manifest(parent_pod_manifest(), manifest() | callback(), Keyword.t()) :: manifest()
-  def manifest(parent_pod_manifest, template_args_or_callback, parent_ref, opts \\ [])
+  def pod_manifest(
+        parent_pod_manifest,
+        template_args_or_callback,
+        parent_ref,
+        app_container_access,
+        opts \\ []
+      )
 
-  def manifest(parent_pod_manifest, template_callback, parent_ref, opts)
+  def pod_manifest(parent_pod_manifest, template_callback, parent_ref, app_container_access, opts)
       when is_function(template_callback) do
-    app_container = app_container(parent_pod_manifest, opts)
+    app_container = app_container(parent_pod_manifest, app_container_access)
     manifest = template_callback.(parent_pod_manifest, app_container)
-    manifest(parent_pod_manifest, manifest, parent_ref, opts)
+    pod_manifest(parent_pod_manifest, manifest, parent_ref, app_container_access, opts)
   end
 
-  def manifest(parent_pod_manifest, manifest, parent_ref, opts) do
-    app_container = app_container(parent_pod_manifest, opts)
+  def pod_manifest(parent_pod_manifest, manifest, parent_ref, app_container_access, opts) do
+    app_container = app_container(parent_pod_manifest, app_container_access)
 
     parent_pod_manifest_name = parent_pod_manifest["metadata"]["name"]
     parent_pod_manifest_namespace = parent_pod_manifest["metadata"]["namespace"]
@@ -61,7 +66,6 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
           # Envs precendence: overridable defaults, template manifest, template :env, non-overridable.
           [
             %{"name" => "PHX_SERVER", "value" => "false"},
-            %{"name" => "RELEASE_COOKIE", "value" => Node.get_cookie()},
             %{"name" => "RELEASE_DISTRIBUTION", "value" => "name"},
             %{"name" => "RELEASE_NODE", "value" => "flame_runner@$(POD_IP)"}
           ]
@@ -87,6 +91,35 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
     end)
   end
 
+  def secret_manifest(parent_pod_manifest, secret_env, opts) do
+    object_references =
+      if opts[:omit_owner_reference],
+        do: [],
+        else: object_references(parent_pod_manifest)
+
+    %{
+      "apiVersion" => "v1",
+      "kind" => "Secret",
+      "metadata" => %{
+        "namespace" => parent_pod_manifest["metadata"]["namespace"],
+        "generateName" => parent_pod_manifest["metadata"]["name"] <> "-",
+        "ownerReferences" => object_references
+      },
+      "stringData" => Map.merge(secret_env, %{"RELEASE_COOKIE" => Node.get_cookie()})
+    }
+  end
+
+  def add_env_secret(pod_manifest, secret_manifest, app_container_access) do
+    pod_manifest =
+      pod_manifest
+      |> update_in(app_container_access ++ [Access.at(0), "envFrom"], fn env_from ->
+        secret_ref = secret_manifest |> Map.fetch!("metadata") |> Map.take(["name", "namespace"])
+        [%{"secretRef" => secret_ref} | List.wrap(env_from)]
+      end)
+
+    {:ok, pod_manifest}
+  end
+
   defp merge_env([], right), do: right
 
   defp merge_env(left, right) do
@@ -105,15 +138,9 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
     left ++ right
   end
 
-  defp app_container(parent_pod_manifest, opts) do
-    container_access =
-      case opts[:app_container_name] do
-        nil -> []
-        name -> [Access.filter(&(&1["name"] == name))]
-      end
-
+  defp app_container(parent_pod_manifest, app_container_access) do
     parent_pod_manifest
-    |> get_in(["spec", "containers" | container_access])
+    |> get_in(app_container_access)
     |> List.first()
   end
 

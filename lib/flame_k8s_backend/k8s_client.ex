@@ -44,7 +44,18 @@ defmodule FLAMEK8sBackend.K8sClient do
     wait_until_scheduled(http, namespace, name, timeout)
   end
 
-  defp wait_until_scheduled(_req, _namespace, _name, timeout) when timeout <= 0, do: :error
+  def delete_secret!(http, namespace, name) do
+    HTTP.delete!(http, secret_path(namespace, name))
+  end
+
+  def create_secret!(http, secret) do
+    namespace = secret["metadata"]["namespace"]
+    created_secret = HTTP.post!(http, secret_path(namespace, ""), JSON.encode!(secret))
+    {:ok, created_secret}
+  end
+
+  defp wait_until_scheduled(_req, _namespace, _name, timeout) when timeout <= 0,
+    do: {:error, :timeout}
 
   defp wait_until_scheduled(req, namespace, name, timeout) do
     case get_pod!(req, namespace, name) do
@@ -59,5 +70,9 @@ defmodule FLAMEK8sBackend.K8sClient do
 
   defp pod_path(namespace, name) do
     "/api/v1/namespaces/#{namespace}/pods/#{name}"
+  end
+
+  defp secret_path(namespace, name) do
+    "/api/v1/namespaces/#{namespace}/secrets/#{name}"
   end
 end

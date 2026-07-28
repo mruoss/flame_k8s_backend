@@ -15,17 +15,22 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
   end
 
   defp env_var_access(name) do
-    app_container_access(["env", Access.filter(&(&1["name"] == name)), "value"])
+    app_container_access_first(["env", Access.filter(&(&1["name"] == name)), "value"])
   end
 
-  defp app_container_access(field \\ []),
+  defp app_container_access_first(field \\ []),
     do: ["spec", "containers", Access.at(0)] ++ List.wrap(field)
+
+  defp app_container_access(field \\ []), do: ["spec", "containers"] ++ List.wrap(field)
+
+  defp named_app_container_access(name, field \\ []),
+    do: ["spec", "containers", Access.filter(&(&1["name"] == name))] ++ List.wrap(field)
 
   setup_all do
     [parent_pod_manifest_full: Pods.parent_pod_manifest_full()]
   end
 
-  describe "manifest/2" do
+  describe "pod_manifest/5" do
     alias FLAMEK8sBackend.TestSupport.Pods
 
     test "should return pod manifest with data form callback", %{
@@ -33,7 +38,7 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
     } do
       callback = fn parent_manifest, app_container ->
         assert parent_manifest == parent_pod_manifest
-        assert get_in(parent_manifest, app_container_access()) == app_container
+        assert get_in(parent_manifest, app_container_access_first()) == app_container
 
         ~y"""
         metadata:
@@ -49,12 +54,13 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                   value: "bar"
         """
         |> put_in(
-          app_container_access(~w(resources requests)),
-          get_in(parent_manifest, app_container_access(~w(resources requests)))
+          app_container_access_first(~w(resources requests)),
+          get_in(parent_manifest, app_container_access_first(~w(resources requests)))
         )
       end
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, callback, make_ref())
+      pod_manifest =
+        MUT.pod_manifest(parent_pod_manifest, callback, make_ref(), app_container_access())
 
       # sets defaults for required ENV vars
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["false"]
@@ -63,8 +69,12 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
 
       # from the callback
       assert get_in(pod_manifest, env_var_access("FOO")) == ["bar"]
-      assert get_in(pod_manifest, app_container_access(~w(resources requests memory))) == "100Mi"
-      assert get_in(pod_manifest, app_container_access(~w(resources limits memory))) == "500Mi"
+
+      assert get_in(pod_manifest, app_container_access_first(~w(resources requests memory))) ==
+               "100Mi"
+
+      assert get_in(pod_manifest, app_container_access_first(~w(resources limits memory))) ==
+               "500Mi"
     end
 
     test "should add default data to pod manifest", %{
@@ -81,8 +91,10 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
                 cpu: 500
       """
 
-      pod_manifest = MUT.manifest(parent_pod_manifest, manifest, make_ref())
-      assert get_in(pod_manifest, app_container_access() ++ ["image"]) == "flame-test-image:0.1.0"
+      pod_manifest =
+        MUT.pod_manifest(parent_pod_manifest, manifest, make_ref(), app_container_access())
+
+      assert get_in(pod_manifest, app_container_access_first("image")) == "flame-test-image:0.1.0"
 
       owner_references = get_in(pod_manifest, ~w(metadata ownerReferences))
       assert length(owner_references) == 1
@@ -106,11 +118,15 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       """
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, manifest, make_ref(),
+        MUT.pod_manifest(
+          parent_pod_manifest,
+          manifest,
+          make_ref(),
+          named_app_container_access("other-container"),
           app_container_name: "other-container"
         )
 
-      assert get_in(pod_manifest, app_container_access() ++ ["image"]) == "other-image:0.1.0"
+      assert get_in(pod_manifest, app_container_access_first("image")) == "other-image:0.1.0"
     end
 
     test "should not add ownerReferences if omitted", %{
@@ -128,7 +144,9 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       """
 
       pod_manifest =
-        MUT.manifest(parent_pod_manifest, manifest, make_ref(), omit_owner_reference: true)
+        MUT.pod_manifest(parent_pod_manifest, manifest, make_ref(), app_container_access(),
+          omit_owner_reference: true
+        )
 
       assert [] == get_in(pod_manifest, ~w(metadata ownerReferences))
     end
@@ -149,7 +167,9 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       env = %{"BAR" => "bar_from_env_opt", "FLAME_PARENT" => "foo"}
 
       ref = make_ref()
-      pod_manifest = MUT.manifest(parent_pod_manifest, manifest, ref, env: env)
+
+      pod_manifest =
+        MUT.pod_manifest(parent_pod_manifest, manifest, ref, app_container_access(), env: env)
 
       # FOO comes from manifest, overriding the overridable default
       assert get_in(pod_manifest, env_var_access("PHX_SERVER")) == ["true"]
@@ -161,6 +181,31 @@ defmodule FLAMEK8sBackend.RunnerPodTemplateTest do
       # FLAME_PARENT from :env is ignored, keeping the expected value
       parent = flame_parent(pod_manifest)
       assert parent.ref == ref
+    end
+  end
+
+  describe "secret_manifest/3" do
+    alias FLAMEK8sBackend.TestSupport.Pods
+
+    test "adds secrets", %{parent_pod_manifest_full: parent_pod_manifest} do
+      secret_manifest =
+        MUT.secret_manifest(parent_pod_manifest, %{"FOO" => "bar", "BAR" => "foo"}, [])
+
+      assert "bar" == get_in(secret_manifest, ~w(stringData FOO))
+      assert "foo" == get_in(secret_manifest, ~w(stringData BAR))
+      assert :nocookie == get_in(secret_manifest, ~w(stringData RELEASE_COOKIE))
+      refute [] == get_in(secret_manifest, ~w(metadata ownerReferences))
+    end
+
+    test "should not add ownerReferences if omitted", %{
+      parent_pod_manifest_full: parent_pod_manifest
+    } do
+      secret_manifest =
+        MUT.secret_manifest(parent_pod_manifest, %{"FOO" => "bar", "BAR" => "foo"},
+          omit_owner_reference: true
+        )
+
+      assert [] == get_in(secret_manifest, ~w(metadata ownerReferences))
     end
   end
 end

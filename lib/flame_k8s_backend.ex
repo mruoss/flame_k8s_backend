@@ -36,6 +36,10 @@ defmodule FLAMEK8sBackend do
       runner. When specified, these environment variables take precendence over
       the ones defined in `:manifest`. This option is a convenience for passing
       extra values read at runtime.
+      See the "Manifest configuration" section below for more details.
+
+    * `:secret_env` - Same as `:env` but these will be applied as a Kubernets
+      secret and appended to the Pod via `envFrom`.
 
     * `:app_container_name` - If your application pod runs multiple containers
       (initContainers excluded), use this option to pass the name of the
@@ -267,17 +271,16 @@ defmodule FLAMEK8sBackend do
   require Logger
 
   defstruct runner_pod_manifest: nil,
+            runner_secret_manifest: nil,
             parent_ref: nil,
             runner_node_name: nil,
-            manifest: nil,
-            env: nil,
             boot_timeout: nil,
             remote_terminator_pid: nil,
-            omit_owner_reference: false,
             log: false,
-            http: nil
+            http: nil,
+            app_container_access: nil
 
-  @valid_opts ~w(app_container_name manifest env terminator_sup log boot_timeout omit_owner_reference)a
+  @valid_opts ~w(app_container_name manifest env secret_env terminator_sup log boot_timeout omit_owner_reference)a
   @required_config ~w()a
 
   @impl true
@@ -306,18 +309,32 @@ defmodule FLAMEK8sBackend do
 
     http = K8sClient.connect()
 
+    app_container_access =
+      case provided_opts[:app_container_name] do
+        nil -> ["spec", "containers"]
+        name -> ["spec", "containers", Access.filter(&(&1["name"] == name))]
+      end
+
     case K8sClient.get_pod(http, System.get_env("POD_NAMESPACE"), System.get_env("POD_NAME")) do
       {:ok, base_pod} ->
         new_state =
           struct(state,
             http: http,
             parent_ref: parent_ref,
+            app_container_access: app_container_access,
             runner_pod_manifest:
-              RunnerPodTemplate.manifest(
+              RunnerPodTemplate.pod_manifest(
                 base_pod,
                 provided_opts[:manifest] || %{},
                 parent_ref,
-                Keyword.take(provided_opts, [:env, :app_container_name, :omit_owner_reference])
+                app_container_access,
+                Keyword.take(provided_opts, [:env, :omit_owner_reference])
+              ),
+            runner_secret_manifest:
+              RunnerPodTemplate.secret_manifest(
+                base_pod,
+                Keyword.get(provided_opts, :secret_env, %{}),
+                Keyword.take(provided_opts, [:omit_owner_reference])
               )
           )
 
@@ -362,15 +379,23 @@ defmodule FLAMEK8sBackend do
 
     {new_state, req_connect_time} =
       with_elapsed_ms(fn ->
-        created_pod =
-          K8sClient.create_pod!(state.http, state.runner_pod_manifest, state.boot_timeout)
+        with {:ok, applied_secret} <-
+               K8sClient.create_secret!(state.http, state.runner_secret_manifest),
+             {:ok, runner_pod_manifest} <-
+               RunnerPodTemplate.add_env_secret(
+                 state.runner_pod_manifest,
+                 applied_secret,
+                 state.app_container_access
+               ),
+             {:ok, pod} <-
+               K8sClient.create_pod!(state.http, runner_pod_manifest, state.boot_timeout) do
+          log(state, "Runner pod and secret created and scheduled",
+            pod_ip: pod["status"]["podIP"]
+          )
 
-        case created_pod do
-          {:ok, pod} ->
-            log(state, "Runner pod created and scheduled", pod_ip: pod["status"]["podIP"])
-            state
-
-          :error ->
+          state
+        else
+          {:error, :timeout} ->
             Logger.error("failed to schedule runner pod within #{state.boot_timeout}ms")
             exit(:timeout)
         end
