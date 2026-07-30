@@ -65,11 +65,10 @@ defmodule FlameK8sBackend.HTTP do
 
       {:ok, {{_, status, reason}, _, resp_body}} ->
         {:error,
-         "failed #{String.upcase("#{verb}")} #{url} with #{inspect(status)} (#{inspect(reason)}): #{inspect(resp_body)} #{inspect(headers)}"}
+         "failed #{String.upcase("#{verb}")} #{url} with #{inspect(status)} (#{inspect(reason)}): #{inspect(resp_body)}"}
 
       {:error, reason} ->
-        {:error,
-         "failed #{String.upcase("#{verb}")} #{url} with #{inspect(reason)} #{inspect(http.headers)}"}
+        {:error, "failed #{String.upcase("#{verb}")} #{url} with #{inspect(reason)}"}
     end
   end
 
