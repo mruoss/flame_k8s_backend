@@ -3,6 +3,7 @@ defmodule FlameK8sBackend.HTTP do
   alias Credo.CLI.Output.Formatter.JSON
   alias FLAME.Parser.JSON
 
+  @derive {Inspect, except: [:token]}
   defstruct [:base_url, :token, :cacertfile]
 
   @type t :: %__MODULE__{
