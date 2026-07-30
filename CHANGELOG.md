@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 <!-- ### Added | Changed | Deprecated | Removed | Fixed | Security -->
 
+<!--------------------- Don't add new entries after this line --------------------->
+
+## [0.7.0] - 2026-07-30
+
 ### Added
 
 * Support for secret env variables. Env variables passed via `:secret_env` will be
@@ -25,9 +29,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Pass `RELEASE_COOKIE` via Kubernetes secret to the runner pod.
 * Hide access token when inspecting the `FlameK8sBackend.HTTP` struct.
 * Remove headers (containing access token) from error message.
-
-
-<!--------------------- Don't add new entries after this line --------------------->
 
 ## [0.6.0] - 2026-03-06
 
