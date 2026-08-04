@@ -3,5 +3,5 @@ TEST_K8S_CLUSTER = "kind"
 
 [tools]
 erlang = "29.0.4"
-elixir = "1.20.2"
+elixir = "1.20.3"
 kind = "0.32.0"
