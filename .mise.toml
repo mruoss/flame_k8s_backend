@@ -4,4 +4,4 @@ env_file = '.env'
 [tools]
 erlang = "29.0.5"
 elixir = "1.20.3"
-kind = "0.32.0"
+kind = "0.33.0"
